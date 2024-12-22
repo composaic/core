@@ -1,6 +1,6 @@
 {
-    "name": "composaic",
-    "version": "0.11.0",
+    "name": "@composaic/core",
+    "version": "0.12.0",
     "description": "A Composable Micro-Frontend Framework",
     "main": "./dist/cjs/index.js",
     "module": "./dist/esm/index.mjs",

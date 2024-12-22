@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.0 (22 Dec 2024)
+
+o Moved project to composaic org, renaming to @composaic/core
+
 ## 0.11.0 (11 Dec 2024)
 
 o Reactive + progressive refactor done
@@ -27,7 +31,7 @@ o moving to @module-federation/enhanced requires some slight refactoring around 
 
 ## 0.9.1 (13 Oct 2024)
 
-Added more details to ErrorBoundary component
+o Added more details to ErrorBoundary component
 
 ## 0.9.0 (12 Oct 2024)
 
@@ -42,28 +46,28 @@ due to remote federation issues around using composaic as a node module
 
 ## 0.4.26 (10 Sep 2024)
 
-Making SignalService use the new GlobalScopeService
+o Making SignalService use the new GlobalScopeService
 
 ## 0.4.25 (10 Sep 2024)
 
-Added GlobalScopeService (vite no longer supports singletons, so we'll need to introduce Window scoped variables for this)
+o Added GlobalScopeService (vite no longer supports singletons, so we'll need to introduce Window scoped variables for this)
 
 ## 0.1.4 (28 May 2024) - Tag test 3
 
-Uhm ... the version in package.json is not automatically bumped :D
+o Uhm ... the version in package.json is not automatically bumped :D
 
 ## 0.1.3 (28 May 2024) - Tag test 2
 
-Installed the NPM_TOKEN as GitHub repository secret
+o Installed the NPM_TOKEN as GitHub repository secret
 
 ## 0.1.3 (28 May 2024) - Tag test 2
 
-Installed the NPM_TOKEN as GitHub repository secret
+o Installed the NPM_TOKEN as GitHub repository secret
 
 ## 0.1.2 (28 May 2024) - Tag test
 
-Trying github pipeline for autopublish based on tags (failed)
+o Trying github pipeline for autopublish based on tags (failed)
 
 ## 0.1.1 (28 May 2024) - First Release
 
-Initial version with test function.
+0 Initial version with test function.
