@@ -7,10 +7,10 @@ import {
 } from './types';
 
 // import all core plugins statically
-import * as logger from './impl/logger/index.js';
-import * as navbar from './impl/navbar/index.js';
-import * as signals from './impl/signals/index.js';
-import * as views from './impl/views/index.js';
+// import * as logger from './impl/logger/index.js';
+// import * as navbar from './impl/navbar/index.js';
+// import * as signals from './impl/signals/index.js';
+// import * as views from './impl/views/index.js';
 import * as bar from './impl/bar/BarPluginModule.js';
 import * as baz from './impl/baz/BazPluginModule.js';
 import * as foo from './impl/foo/FooPluginModule.js';
@@ -20,10 +20,10 @@ import { LoggingService } from '../services/LoggingService.js';
 const pluginModule = 'plugins';
 
 const moduleMap: { [key: string]: object } = {
-    'logger/index': logger,
-    'navbar/index': navbar,
-    'signals/index': signals,
-    'views/index': views,
+    // 'logger/index': logger,
+    // 'navbar/index': navbar,
+    // 'signals/index': signals,
+    // 'views/index': views,
     'bar/BarPluginModule': bar,
     'baz/BazPluginModule': baz,
     'foo/FooPluginModule': foo,

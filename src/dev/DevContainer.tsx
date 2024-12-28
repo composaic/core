@@ -10,12 +10,14 @@ import { Configuration } from '../services/configuration.js';
 import { PluginDescriptor } from '../plugins/types.js';
 
 interface DevContainerProps {
-    loadModuleFn(pluginDescriptor: PluginDescriptor): Promise<object | undefined>;
+    getCorePluginDefinitions: () => PluginDescriptor[];
+    loadModule(pluginDescriptor: PluginDescriptor): Promise<object | undefined>;
     config: Configuration;
 }
 
 export const DevContainer: FC<DevContainerProps> = ({
-    loadModuleFn,
+    getCorePluginDefinitions,
+    loadModule,
     config,
 }) => {
     const [routes, setRoutes] = useState<JSX.Element[]>([]);
@@ -25,19 +27,24 @@ export const DevContainer: FC<DevContainerProps> = ({
         if (!menuItemsLoaded.current) {
             menuItemsLoaded.current = true;
             init({
-                addLocalPluginsFn: async () => {
-                    await addLocalPlugins(loadModuleFn);
+                getCorePluginDefinitions: () => {
+                    return getCorePluginDefinitions();
+                },
+                addLocalPlugins: async () => {
+                    await addLocalPlugins(loadModule);
                 },
                 // FIXME: remote module loading in dev container not supported as yet
-                loadRemoteModuleFn: async () => Promise.resolve({}),
+                loadRemoteModule: async () => Promise.resolve({}),
                 config,
-            }).then(() => {
-                getRoutes().then((generatedRoutes) => {
-                    setRoutes(generatedRoutes);
+            })
+                .then(() => {
+                    getRoutes().then((generatedRoutes) => {
+                        setRoutes(generatedRoutes);
+                    });
+                })
+                .catch((err) => {
+                    console.error(err);
                 });
-            }).catch((err) => {
-                console.error(err);
-            });
         }
     }, []);
 
