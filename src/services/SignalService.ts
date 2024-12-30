@@ -1,6 +1,6 @@
 import { PluginManager } from '../plugins/PluginManager.js';
 import { SignalsPlugin } from '../plugins/impl/signals';
-import { LoggingService } from './LoggingService.js';
+import { LoggingService } from '../services/LoggingService.js';
 
 export type Signal = {
     type: string;

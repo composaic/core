@@ -1,4 +1,3 @@
-import { loadPluginDefinitions } from '../plugins/manifest-util.js';
 import { createServices } from '../services/ServiceManager.js';
 import { RemotePluginLoader } from '../services/RemotePluginLoader.js';
 import {
@@ -9,6 +8,7 @@ import { PluginManager } from '../plugins/PluginManager.js';
 import { LoggingService } from '../services/LoggingService.js';
 import { RemoteModuleLoaderService } from '../services/RemoteModuleLoaderService.js';
 import { LogCore, PluginDescriptor } from '../plugins/types.js';
+import { getSystemPluginDefinitions } from './plugin-utils.js';
 
 export type RemoteModule = {
     url: string;
@@ -42,6 +42,8 @@ export const init = async (options: InitOptions) => {
         loadRemoteModule,
     } = options;
     RemoteModuleLoaderService.initialiseStaticInstance(loadRemoteModule);
+    const systemPlugins = getSystemPluginDefinitions();
+    await PluginManager.getInstance().addPluginDefinitions(systemPlugins);
     const corePlugins = getCorePluginDefinitions();
     await PluginManager.getInstance().addPluginDefinitions(corePlugins);
     await LoggingService.createInstance(true);

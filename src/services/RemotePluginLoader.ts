@@ -2,7 +2,7 @@ import { convertManifestToPluginDescriptor } from '../dev/plugin-utils.js';
 import { PluginManager } from '../plugins/PluginManager.js';
 import { PluginDescriptor } from '../plugins/types.js';
 import { RemoteDefinition } from './configuration.js';
-import { LoggingService } from './LoggingService.js';
+import { LoggingService } from '../services/LoggingService.js';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
