@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.1 (3 Jan 2025)
+
+o Removed React related stuff from dependencies
+
 ## 0.12.0 (22 Dec 2024)
 
 o Moved project to composaic org, renaming to @composaic/core
