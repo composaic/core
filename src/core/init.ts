@@ -21,8 +21,17 @@ export type RemoteModuleLoaderFn = (
     remoteModule: RemoteModule
 ) => Promise<object | undefined>;
 
+/**
+ * PluginModule is a module (NPM etc) that provides plugins to be loaded statically at startup.
+ * An example is @composaic/web which provides basic web application functionality for web apps.
+ */
+export type PluginModule = {
+    getPluginDefinitions: () => PluginDescriptor[];
+    getModuleName: () => string;
+}
+
 interface InitOptions {
-    getCorePluginDefinitions: () => PluginDescriptor[];
+    getPluginModules?: () => PluginModule[];
     addLocalPlugins?: () => void;
     config?: Configuration;
     loadRemoteModule: RemoteModuleLoaderFn;
@@ -36,7 +45,7 @@ export const init = async (options: InitOptions) => {
         message: 'Logging service initialised.',
     });
     const {
-        getCorePluginDefinitions,
+        getPluginModules,
         addLocalPlugins,
         config,
         loadRemoteModule,
@@ -44,8 +53,16 @@ export const init = async (options: InitOptions) => {
     RemoteModuleLoaderService.initialiseStaticInstance(loadRemoteModule);
     const systemPlugins = getSystemPluginDefinitions();
     await PluginManager.getInstance().addPluginDefinitions(systemPlugins);
-    const corePlugins = getCorePluginDefinitions();
-    await PluginManager.getInstance().addPluginDefinitions(corePlugins);
+    
+    if (getPluginModules) {
+        getPluginModules().map(async (pluginModule) => {
+            console.log(`[composaic] Adding plugin module ${pluginModule.getModuleName()}`);
+            const definitions = pluginModule.getPluginDefinitions();
+            console.log(`[composaic] Plugin definitions:`, JSON.stringify(definitions, null, 2));
+            await PluginManager.getInstance().addPluginDefinitions(definitions);
+        });
+    }
+    
     await LoggingService.createInstance(true);
     await addLocalPlugins?.();
     const configuration =

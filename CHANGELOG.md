@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.13.0 (26 Jan 2025)
+
+o Extracted web application plugins to @composaic/web
+o Implemented new interface to access plugins in PluginModule
+
 ## 0.12.1 (3 Jan 2025)
 
 o Removed React related stuff from dependencies
