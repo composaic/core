@@ -1,4 +1,3 @@
-import { loadPluginDefinitions } from '../plugins/manifest-util.js';
 import { createServices } from '../services/ServiceManager.js';
 import { RemotePluginLoader } from '../services/RemotePluginLoader.js';
 import {
@@ -8,7 +7,8 @@ import {
 import { PluginManager } from '../plugins/PluginManager.js';
 import { LoggingService } from '../services/LoggingService.js';
 import { RemoteModuleLoaderService } from '../services/RemoteModuleLoaderService.js';
-import { LogCore } from '../plugins/types.js';
+import { LogCore, PluginDescriptor } from '../plugins/types.js';
+import { getSystemPluginDefinitions } from './plugin-utils.js';
 
 export type RemoteModule = {
     url: string;
@@ -22,9 +22,10 @@ export type RemoteModuleLoaderFn = (
 ) => Promise<object | undefined>;
 
 interface InitOptions {
-    addLocalPluginsFn?: () => void;
+    getCorePluginDefinitions: () => PluginDescriptor[];
+    addLocalPlugins?: () => void;
     config?: Configuration;
-    loadRemoteModuleFn: RemoteModuleLoaderFn;
+    loadRemoteModule: RemoteModuleLoaderFn;
 }
 
 export const init = async (options: InitOptions) => {
@@ -34,12 +35,19 @@ export const init = async (options: InitOptions) => {
         module: LogCore,
         message: 'Logging service initialised.',
     });
-    const { addLocalPluginsFn, config, loadRemoteModuleFn } = options;
-    RemoteModuleLoaderService.initialiseStaticInstance(loadRemoteModuleFn);
-    const corePlugins = await loadPluginDefinitions();
+    const {
+        getCorePluginDefinitions,
+        addLocalPlugins,
+        config,
+        loadRemoteModule,
+    } = options;
+    RemoteModuleLoaderService.initialiseStaticInstance(loadRemoteModule);
+    const systemPlugins = getSystemPluginDefinitions();
+    await PluginManager.getInstance().addPluginDefinitions(systemPlugins);
+    const corePlugins = getCorePluginDefinitions();
     await PluginManager.getInstance().addPluginDefinitions(corePlugins);
     await LoggingService.createInstance(true);
-    await addLocalPluginsFn?.();
+    await addLocalPlugins?.();
     const configuration =
         ConfigurationService.getInstance(config).getConfiguration();
     LoggingService.getInstance().info({

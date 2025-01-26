@@ -1,5 +1,5 @@
-import { PluginManager } from '../../PluginManager.js';
 import { Plugin } from '../../types.js';
+import { PluginManager } from '../../PluginManager.js';
 
 export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 
