@@ -1,20 +1,21 @@
 {
     "compilerOptions": {
-        "sourceMap": true,
-        "lib": [
-            "esnext",
-            "dom"
-        ],
+        "target": "ES2022",
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
         "declaration": true,
-        "declarationDir": "./dist/types",
+        "sourceMap": true,
         "strict": true,
+        "baseUrl": ".",
+        "rootDir": "./src",
+        "resolveJsonModule": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
-        "moduleResolution": "node",
-        "baseUrl": ".",
-        "rootDir": "./src",
-        "resolveJsonModule": true
+        "lib": [
+            "esnext",
+            "dom"
+        ]
     },
     "include": [
         "src"
