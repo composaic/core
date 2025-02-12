@@ -8,7 +8,8 @@
 import * as ts from 'typescript';
 import * as path from 'path';
 import * as fs from 'fs';
-import { PluginManifest, PluginMetadataType, CollectionManifest, RemoteConfig } from './types';
+import { PluginManifest, PluginMetadataType, CollectionManifest, RemoteConfig, ExtensionMetadata } from './types';
+import { Metadata } from './decorators';
 
 /**
  * Options for generating a single plugin manifest
@@ -56,108 +57,53 @@ export interface GenerateCollectionOptions {
 }
 
 /**
- * ManifestGenerator class handles the generation of plugin manifests by analyzing TypeScript source files.
- * It uses the TypeScript Compiler API to extract metadata from decorated plugin classes.
+ * ManifestGenerator is responsible for generating plugin manifests by analyzing TypeScript source files
+ * and extracting metadata from plugin classes.
  */
 export class ManifestGenerator {
-    /**
-     * TypeScript program instance
-     */
     private program: ts.Program;
-    /**
-     * TypeScript type checker instance
-     */
     private typeChecker: ts.TypeChecker;
+    private options: { tsConfigPath: string; pluginPath: string };
 
-    /**
-     * Creates a new ManifestGenerator instance
-     * 
-     * @param sourcePaths Array of source file paths
-     * @param projectPath Optional project path for relative paths
-     */
-    constructor(sourcePaths: string[], projectPath?: string) {
-        const configPath = ts.findConfigFile(
-            projectPath || path.dirname(sourcePaths[0]),
-            fs.existsSync,
-            'tsconfig.json'
-        );
+    constructor(options: { tsConfigPath: string; pluginPath: string }) {
+        this.options = options;
+        const { tsConfigPath } = options;
 
-        if (!configPath) {
-            throw new Error('Could not find a valid tsconfig.json.');
-        }
-
-        const { config } = ts.readConfigFile(configPath, ts.sys.readFile);
-        const { options, errors } = ts.parseJsonConfigFileContent(
-            config,
+        // Load and parse tsconfig.json
+        const configFile = ts.readConfigFile(tsConfigPath, ts.sys.readFile);
+        const parsedConfig = ts.parseJsonConfigFileContent(
+            configFile.config,
             ts.sys,
-            path.dirname(configPath)
+            path.dirname(tsConfigPath)
         );
 
-        if (errors.length > 0) {
-            throw new Error(`Error parsing tsconfig.json: ${errors.map(e => e.messageText).join(', ')}`);
-        }
-
-        console.log('TypeScript configuration:');
-        console.log(options);
-
-        // Add compiler options needed for decorator metadata
-        const compilerOptions: ts.CompilerOptions = {
-            ...options,
-            noEmit: true,
-            declaration: false,
-            target: ts.ScriptTarget.ESNext,
-            module: ts.ModuleKind.NodeNext,
-            moduleResolution: ts.ModuleResolutionKind.NodeNext,
-            jsx: ts.JsxEmit.None,
-            allowJs: false,
-            resolveJsonModule: true
-        };
-
-        console.log('Final compiler options:', compilerOptions);
-
-        // Create program with all source files
-        const program = ts.createProgram(sourcePaths, compilerOptions);
-        const diagnostics = ts.getPreEmitDiagnostics(program);
-
-        if (diagnostics.length > 0) {
-            console.log('TypeScript diagnostics:', diagnostics.map(d => d.messageText));
-        }
-
-        console.log('Source files:', sourcePaths);
-        const sourceFiles = program.getSourceFiles();
-        console.log('Loaded source files:', sourceFiles.map(f => f.fileName));
-
-        if (diagnostics.length > 0) {
-            const messages = diagnostics.map(d => {
-                const message = ts.flattenDiagnosticMessageText(d.messageText, '\n');
-                if (d.file) {
-                    const { line, character } = d.file.getLineAndCharacterOfPosition(d.start!);
-                    return `${d.file.fileName} (${line + 1},${character + 1}): ${message}`;
-                }
-                return message;
-            });
-            console.error('TypeScript compilation errors:', messages.join('\n'));
-        }
-
-        this.program = program;
-        this.typeChecker = program.getTypeChecker();
+        // Create program instance
+        this.program = ts.createProgram({
+            rootNames: [options.pluginPath],
+            options: parsedConfig.options
+        });
+        this.typeChecker = this.program.getTypeChecker();
     }
 
     /**
-     * Generates a manifest for a single plugin
-     * 
-     * @param options GenerateOptions instance
-     * @returns Plugin metadata instance or null if generation fails
+     * Generate a manifest for a single plugin
      */
-    generate(options: GenerateOptions): PluginMetadataType | null {
-        const sourceFile = this.program.getSourceFile(options.sourcePath);
+    async generateManifest(): Promise<PluginMetadataType> {
+        const sourceFile = this.program.getSourceFile(this.options.pluginPath);
         if (!sourceFile) {
-            throw new Error(`Could not load source file: ${options.sourcePath}`);
+            throw new Error(`Could not load source file: ${this.options.pluginPath}`);
         }
 
         const { pluginClass, metadata } = this.findPluginClass(sourceFile);
-        if (!pluginClass) {
-            return null;
+        if (!pluginClass || !metadata) {
+            throw new Error('No plugin class found');
+        }
+
+        // Get extension metadata from all classes in the file
+        const extensions = this.findAllExtensionMetadata(sourceFile);
+        if (extensions.length > 0) {
+            metadata.extensions = metadata.extensions || [];
+            metadata.extensions.push(...extensions);
         }
 
         return metadata;
@@ -165,16 +111,16 @@ export class ManifestGenerator {
 
     /**
      * Generates a collection manifest for multiple plugins
-     * 
-     * @param options GenerateCollectionOptions instance
-     * @returns CollectionManifest instance
      */
-    public generateCollection(options: GenerateCollectionOptions): CollectionManifest {
-        const plugins = options.pluginSources.map(source => {
-            const manifest = this.generate({
-                sourcePath: source.sourcePath,
-                projectPath: options.projectPath
+    async generateCollection(options: GenerateCollectionOptions): Promise<CollectionManifest> {
+        const plugins = await Promise.all(options.pluginSources.map(async source => {
+            // Create a new generator for each plugin
+            const generator = new ManifestGenerator({
+                tsConfigPath: this.options.tsConfigPath,
+                pluginPath: source.sourcePath
             });
+            
+            const manifest = await generator.generateManifest();
             
             if (!manifest) {
                 return {
@@ -188,9 +134,9 @@ export class ManifestGenerator {
             
             return {
                 remote: source.remote,
-                definitions: [manifestWithoutExtensionPoints].filter(Boolean) as PluginMetadataType[]
+                definitions: [manifestWithoutExtensionPoints]
             };
-        });
+        }));
 
         return {
             name: options.name,
@@ -198,27 +144,14 @@ export class ManifestGenerator {
         };
     }
 
-    /**
-     * Finds a plugin class in a source file
-     * 
-     * @param sourceFile Source file instance
-     * @returns Plugin class instance and metadata or null if not found
-     */
-    private findPluginClass(sourceFile: ts.SourceFile): { pluginClass: ts.ClassDeclaration, metadata: PluginMetadataType } {
-        const pluginClasses: { pluginClass: ts.ClassDeclaration, metadata: PluginMetadataType }[] = [];
-        
+    private findPluginClass(sourceFile: ts.SourceFile): { pluginClass: ts.ClassDeclaration; metadata: PluginMetadataType } {
+        const pluginClasses: { pluginClass: ts.ClassDeclaration; metadata: PluginMetadataType }[] = [];
+
         const visit = (node: ts.Node) => {
             if (ts.isClassDeclaration(node) && node.name) {
-                console.log(`Found class: ${node.name.text}`);
-                
-                // Check if class has @PluginMetadata decorator
-                const pluginMetadata = this.getPluginMetadata(node);
-                if (pluginMetadata) {
-                    console.log(`Found plugin class: ${node.name.text}`);
-                    pluginClasses.push({ 
-                        pluginClass: node,
-                        metadata: pluginMetadata
-                    });
+                const metadata = this.getPluginMetadata(node);
+                if (metadata) {
+                    pluginClasses.push({ pluginClass: node, metadata });
                 }
             }
             ts.forEachChild(node, visit);
@@ -232,25 +165,31 @@ export class ManifestGenerator {
         }
 
         if (pluginClasses.length === 0) {
-            throw new Error(`No plugin class found in ${sourceFile.fileName}`);
+            throw new Error('No plugin class found');
         }
 
         return pluginClasses[0];
     }
 
-    /**
-     * Gets the plugin metadata from a class declaration
-     * 
-     * @param node Class declaration instance
-     * @returns Plugin metadata instance or undefined if not found
-     */
+    private findAllExtensionMetadata(sourceFile: ts.SourceFile): ExtensionMetadata[] {
+        const extensions: ExtensionMetadata[] = [];
+
+        const visit = (node: ts.Node) => {
+            if (ts.isClassDeclaration(node)) {
+                const classExtensions = this.getExtensionMetadata(node);
+                extensions.push(...classExtensions);
+            }
+            ts.forEachChild(node, visit);
+        };
+
+        visit(sourceFile);
+        return extensions;
+    }
+
     private getPluginMetadata(node: ts.ClassDeclaration): PluginMetadataType | undefined {
         if (!ts.canHaveDecorators(node)) return undefined;
         const decorators = ts.getDecorators(node);
         if (!decorators) return undefined;
-
-        let pluginMetadata: Partial<PluginMetadataType> | undefined;
-        let extensionMetadata: any | undefined;
 
         for (const decorator of decorators) {
             if (!ts.isCallExpression(decorator.expression)) continue;
@@ -262,55 +201,43 @@ export class ManifestGenerator {
             if (!declaration || !ts.isMethodDeclaration(declaration) && !ts.isFunctionDeclaration(declaration)) continue;
 
             const name = declaration.name?.getText();
-            if (name !== 'PluginMetadata' && name !== 'ExtensionMetadata') continue;
+            if (name !== 'PluginMetadata') continue;
 
             const arg = decorator.expression.arguments[0];
             if (!ts.isObjectLiteralExpression(arg)) continue;
 
-            const metadata: any = {};
-            
-            for (const prop of arg.properties) {
-                if (!ts.isPropertyAssignment(prop)) continue;
-                
-                const propName = prop.name.getText();
-                const propValue = prop.initializer;
-                
-                if (ts.isStringLiteral(propValue)) {
-                    metadata[propName] = propValue.text;
-                } else if (ts.isArrayLiteralExpression(propValue)) {
-                    metadata[propName] = this.parseArrayLiteral(propValue);
-                } else if (ts.isObjectLiteralExpression(propValue)) {
-                    metadata[propName] = this.parseObjectLiteral(propValue);
-                }
-            }
-
-            if (name === 'PluginMetadata') {
-                pluginMetadata = metadata;
-            } else if (name === 'ExtensionMetadata') {
-                extensionMetadata = metadata;
-            }
+            return this.parseObjectLiteral(arg);
         }
 
-        if (!pluginMetadata) return undefined;
-
-        if (extensionMetadata) {
-            pluginMetadata.extensions = [extensionMetadata];
-        }
-
-        return pluginMetadata as PluginMetadataType;
+        return undefined;
     }
 
-    private parseArrayLiteral(array: ts.ArrayLiteralExpression): any[] {
-        return array.elements.map(element => {
-            if (ts.isObjectLiteralExpression(element)) {
-                return this.parseObjectLiteral(element);
-            } else if (ts.isStringLiteral(element)) {
-                return element.text;
-            } else if (ts.isNumericLiteral(element)) {
-                return Number(element.text);
-            }
-            return null;
-        }).filter(Boolean);
+    private getExtensionMetadata(node: ts.ClassDeclaration): ExtensionMetadata[] {
+        if (!ts.canHaveDecorators(node)) return [];
+        const decorators = ts.getDecorators(node);
+        if (!decorators) return [];
+
+        const extensions: ExtensionMetadata[] = [];
+
+        for (const decorator of decorators) {
+            if (!ts.isCallExpression(decorator.expression)) continue;
+
+            const signature = this.typeChecker.getResolvedSignature(decorator.expression);
+            if (!signature) continue;
+
+            const declaration = signature.declaration;
+            if (!declaration || !ts.isMethodDeclaration(declaration) && !ts.isFunctionDeclaration(declaration)) continue;
+
+            const name = declaration.name?.getText();
+            if (name !== 'ExtensionMetadata') continue;
+
+            const arg = decorator.expression.arguments[0];
+            if (!ts.isObjectLiteralExpression(arg)) continue;
+
+            extensions.push(this.parseObjectLiteral(arg));
+        }
+
+        return extensions;
     }
 
     private parseObjectLiteral(obj: ts.ObjectLiteralExpression): any {
@@ -332,6 +259,19 @@ export class ManifestGenerator {
             }
         }
         return result;
+    }
+
+    private parseArrayLiteral(array: ts.ArrayLiteralExpression): any[] {
+        return array.elements.map(element => {
+            if (ts.isObjectLiteralExpression(element)) {
+                return this.parseObjectLiteral(element);
+            } else if (ts.isStringLiteral(element)) {
+                return element.text;
+            } else if (ts.isNumericLiteral(element)) {
+                return Number(element.text);
+            }
+            return null;
+        }).filter(Boolean);
     }
 
     /**

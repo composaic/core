@@ -1,48 +1,38 @@
 import { Plugin } from '../mock-plugin.js';
-import { PluginMetadata, ExtensionMetadata } from '../../../decorators.js';
+import { PluginMetadata, ExtensionMetadata } from '../../../decorators';
 
-export interface NavbarItem {
-    id: string;
-    label: string;
-    mountAt: string;
-    children: {
-        label: string;
-        path: string;
-        component: string;
-    }[];
+interface MenuItem {
+    text: string;
+    url: string;
 }
 
 @PluginMetadata({
-    plugin: '@composaic-tests/navbar',
-    version: '1.0',
-    description: 'Extension for the @composaic/navbar plugin',
-    load: 'deferred',
-    package: 'navbar',
-    module: 'NavbarExtension'
-})
-@ExtensionMetadata({
-    plugin: '@composaic/navbar',
-    id: 'navbarItem',
-    className: 'NavbarItemExtension',
-    meta: [{
-        id: 'test.RemoteExamples',
-        label: 'Remote Examples',
-        mountAt: 'root.Profile',
-        children: [{
-            label: 'Remote Example',
-            path: '/remoteexample',
-            component: 'RemoteExamplePage'
-        }]
+    name: 'NavbarExtension',
+    version: '1.0.0',
+    description: 'A navbar extension plugin',
+    extensionPoints: [{
+        id: 'navbar',
+        type: 'NavbarExtensionPoint'
     }]
 })
-export class NavbarExtensionPlugin extends Plugin {
-    async start() {
-        // Plugin initialization
+export class NavbarExtension {
+    items: MenuItem[] = [];
+
+    addItem(item: MenuItem): void {
+        this.items.push(item);
     }
 }
 
-export class NavbarItemExtension {
-    getNavbarItems(): NavbarItem[] {
-        return [];
-    }
+@ExtensionMetadata({
+    extensionPoint: {
+        id: 'navbar',
+        type: 'NavbarExtensionPoint'
+    },
+    implementation: 'CustomMenuItem'
+})
+export class CustomMenuItem implements MenuItem {
+    constructor(
+        public text: string,
+        public url: string
+    ) {}
 }

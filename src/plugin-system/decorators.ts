@@ -6,64 +6,32 @@
  * and extensions, allowing for runtime discovery and loading of plugin functionality.
  */
 
-import type { ExtensionPointMetadata, PluginMetadataType, ExtensionMetadata } from './types.js';
+import type { PluginMetadataType, ExtensionMetadata } from './types.js';
 
 /** Type definition for a constructor function */
 type Constructor = { new (...args: any[]): any };
 
 /**
- * Decorator to mark a class as a plugin.
+ * Decorator for marking a class as a plugin.
  * This decorator attaches plugin metadata to the class, making it discoverable
  * by the plugin system at runtime.
  * 
- * @param metadata Plugin metadata excluding extensions
+ * @param metadata Plugin metadata
  * @returns Class decorator function
  * 
  * @example
  * ```typescript
  * @PluginMetadata({
- *   plugin: "@composaic/navbar",
- *   version: "1.0.0",
- *   package: "navbar",
- *   module: "NavbarExtension",
- *   class: "NavbarPlugin"
+ *   name: 'NavbarExtension',
+ *   version: '1.0.0',
+ *   description: 'A navbar extension plugin'
  * })
  * class NavbarPlugin { }
  * ```
  */
-export function PluginMetadata(metadata: Omit<PluginMetadataType, 'extensions'>) {
+export function PluginMetadata(metadata: PluginMetadataType) {
     return function(target: Constructor) {
         Object.defineProperty(target, 'pluginMetadata', {
-            value: {
-                ...metadata,
-                kind: 'plugin'
-            },
-            writable: false
-        });
-        return target;
-    };
-}
-
-/**
- * Decorator for marking a class as an extension point.
- * Extension points define areas where plugins can extend or modify the core application.
- * 
- * @param metadata Array of extension point metadata
- * @returns Class decorator function
- * 
- * @example
- * ```typescript
- * @ExtensionPointMetadata([{
- *   id: "navbar.menu",
- *   type: "MenuExtensionPoint",
- *   description: "Extension point for navbar menu items"
- * }])
- * class NavbarPlugin { }
- * ```
- */
-export function ExtensionPointMetadata(metadata: ExtensionPointMetadata[]) {
-    return function(target: Constructor) {
-        Object.defineProperty(target, 'extensionPointMetadata', {
             value: metadata,
             writable: false
         });
@@ -72,8 +40,8 @@ export function ExtensionPointMetadata(metadata: ExtensionPointMetadata[]) {
 }
 
 /**
- * Decorator to mark a class as providing an extension.
- * Extensions are concrete implementations of extension points provided by plugins.
+ * Decorator for marking a class as an extension.
+ * Extensions implement specific extension points defined by plugins.
  * 
  * @param metadata Extension metadata
  * @returns Class decorator function
@@ -81,11 +49,10 @@ export function ExtensionPointMetadata(metadata: ExtensionPointMetadata[]) {
  * @example
  * ```typescript
  * @ExtensionMetadata({
- *   plugin: "@composaic/navbar",
- *   id: "navbar.menu",
- *   className: "CustomMenuItem"
+ *   extensionPoint: 'navbar.menu',
+ *   implementation: 'NavbarItemExtension'
  * })
- * class CustomMenuItem { }
+ * class NavbarItemExtension { }
  * ```
  */
 export function ExtensionMetadata(metadata: ExtensionMetadata) {
@@ -98,12 +65,8 @@ export function ExtensionMetadata(metadata: ExtensionMetadata) {
     };
 }
 
-/**
- * Helper functions to extract metadata from decorated classes.
- * These utilities are used internally by the plugin system to discover
- * and load plugins, extension points, and extensions at runtime.
- */
-export const MetadataHelpers = {
+/** Metadata utility functions */
+export const Metadata = {
     /**
      * Gets plugin metadata from a decorated class
      * 
@@ -112,16 +75,6 @@ export const MetadataHelpers = {
      */
     getPluginMetadata(target: Constructor): PluginMetadataType | undefined {
         return (target as any).pluginMetadata;
-    },
-
-    /**
-     * Gets extension point metadata from a decorated class
-     * 
-     * @param target Class constructor
-     * @returns Array of extension point metadata
-     */
-    getExtensionPointMetadata(target: Constructor): ExtensionPointMetadata[] {
-        return (target as any).extensionPointMetadata || [];
     },
 
     /**

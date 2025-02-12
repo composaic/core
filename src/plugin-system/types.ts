@@ -6,16 +6,14 @@
  */
 
 /**
- * Metadata for a plugin extension point.
- * Extension points define specific areas where plugins can extend or modify the core application.
+ * Extension point metadata type.
+ * Defines a point where other plugins can extend functionality.
  */
 export interface ExtensionPointMetadata {
     /** Unique identifier for the extension point */
     id: string;
     /** Type of the extension point */
     type: string;
-    /** Optional description of what this extension point does */
-    description?: string;
 }
 
 /**
@@ -23,69 +21,67 @@ export interface ExtensionPointMetadata {
  * Represents a concrete implementation of an extension point by a plugin.
  */
 export interface ExtensionMetadata {
-    /** Plugin that owns this extension */
-    plugin: string;   
     /** ID of the extension point being implemented */
-    id: string;       
-    /** Name of the implementing class */
-    className: string;  
+    extensionPoint: ExtensionPointMetadata;
     /** Additional extension-specific metadata */
-    meta?: unknown;   
+    [key: string]: any;
 }
 
 /**
- * Complete metadata for a plugin.
- * Contains all necessary information to load and initialize a plugin.
+ * Plugin metadata type.
+ * Defines the metadata for a plugin, including its name, version, and dependencies.
  */
 export interface PluginMetadataType {
-    /** Unique identifier for the plugin */
-    plugin: string;
-    /** Plugin version */
+    /** Name of the plugin */
+    name: string;
+    /** Version of the plugin */
     version: string;
-    /** Optional description of what the plugin does */
+    /** Description of the plugin */
     description?: string;
-    /** Loading strategy for the plugin */
-    load?: 'eager' | 'deferred';
-    /** Package name */
-    package: string;
-    /** Module name */
-    module: string;
-    /** Extensions provided by this plugin */
-    extensions?: ExtensionMetadata[];
+    /** Author of the plugin */
+    author?: string;
     /** Extension points provided by this plugin */
     extensionPoints?: ExtensionPointMetadata[];
+    /** Extensions provided by this plugin */
+    extensions?: ExtensionMetadata[];
 }
 
 /**
- * Remote configuration for a plugin.
- * Specifies how to load a plugin from a remote source.
+ * Plugin manifest type.
+ * Represents a single plugin manifest file.
  */
-export interface RemoteConfig {
-    /** Remote name (e.g., "TestPlugins") */
-    name: string;      
-    /** Bundle file path (e.g., "TestPlugins.js") */
-    bundleFile: string; 
+export interface PluginManifest extends PluginMetadataType {
+    /** Remote configuration for plugin loading */
+    remote?: RemoteConfig;
 }
 
 /**
- * Collection manifest structure.
- * Represents a collection of plugins that are distributed together.
+ * Collection manifest type.
+ * Represents a collection of plugin manifests.
  */
 export interface CollectionManifest {
-    /** Collection name (e.g., "@composaic/plugin-test") */
-    name: string;      
-    /** Array of plugins in this collection */
+    /** Name of the collection */
+    name: string;
+    /** Version of the collection */
+    version?: string;
+    /** Description of the collection */
+    description?: string;
+    /** List of plugins in the collection */
     plugins: {
-        /** Remote configuration for loading the plugin */
-        remote: RemoteConfig;
-        /** Plugin definitions in this collection */
+        /** Remote configuration for plugin loading */
+        remote?: RemoteConfig;
+        /** List of plugin definitions */
         definitions: PluginMetadataType[];
     }[];
 }
 
 /**
- * Plugin manifest containing metadata about a plugin
+ * Remote configuration type.
+ * Defines how a plugin should be loaded from a remote source.
  */
-export interface PluginManifest {
-    plugin: PluginMetadataType;
+export interface RemoteConfig {
+    /** URL to load the plugin from */
+    url?: string;
+    /** Bundle file name */
+    bundleFile?: string;
 }

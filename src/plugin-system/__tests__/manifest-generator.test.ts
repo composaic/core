@@ -3,111 +3,130 @@ import { ManifestGenerator } from '../manifest-generator';
 
 describe('ManifestGenerator', () => {
     const fixturesDir = path.join(__dirname, 'fixtures');
-    const navbarPluginPath = path.join(fixturesDir, 'navbar/NavbarExtension.ts');
-    const loggerPluginPath = path.join(fixturesDir, 'simplelogger/SimpleLogger.ts');
-    const pluginPaths = [
-        navbarPluginPath,
-        loggerPluginPath
-    ];
+    const navbarPluginPath = path.join(fixturesDir, 'navbar', 'NavbarExtension.ts');
+    const loggerPluginPath = path.join(fixturesDir, 'simplelogger', 'SimpleLogger.ts');
+    const multiplePluginsPath = path.join(fixturesDir, 'multiple', 'MultiplePlugins.ts');
+    const tsConfigPath = path.join(fixturesDir, 'tsconfig.json');
 
-    describe('Single Plugin Manifest', () => {
-        it('should generate manifest for navbar plugin', async () => {
-            const generator = new ManifestGenerator([navbarPluginPath]);
-            const manifest = generator.generate({ sourcePath: navbarPluginPath });
-            expect(manifest).toMatchObject({
-                plugin: '@composaic-tests/navbar',
-                version: '1.0'
+    describe('generateManifest', () => {
+        it('should generate manifest for NavbarExtension plugin', async () => {
+            const generator = new ManifestGenerator({ 
+                tsConfigPath,
+                pluginPath: navbarPluginPath 
             });
-        });
-
-        it('should generate manifest for logger plugin', async () => {
-            const generator = new ManifestGenerator([loggerPluginPath]);
-            const manifest = generator.generate({ sourcePath: loggerPluginPath });
-            expect(manifest).toMatchObject({
-                plugin: '@composaic-tests/simple-logger',
-                version: '1.0'
-            });
-        });
-
-        it('should throw error when multiple plugins are in one file', async () => {
-            const multiplePluginsPath = path.join(__dirname, 'fixtures/multiplugins/MultiplePlugins.ts');
-            const generator = new ManifestGenerator([multiplePluginsPath]);
             
-            expect(() => {
-                generator.generate({ sourcePath: multiplePluginsPath });
-            }).toThrow(/Multiple plugin classes found.*FirstPlugin.*SecondPlugin/);
+            const manifest = await generator.generateManifest();
+            
+            expect(manifest).toEqual({
+                name: 'NavbarExtension',
+                version: '1.0.0',
+                description: 'A navbar extension plugin',
+                extensionPoints: [{
+                    id: 'navbar',
+                    type: 'NavbarExtensionPoint'
+                }],
+                extensions: [{
+                    extensionPoint: {
+                        id: 'navbar',
+                        type: 'NavbarExtensionPoint'
+                    },
+                    implementation: 'CustomMenuItem'
+                }]
+            });
+        });
+
+        it('should generate manifest for SimpleLogger plugin', async () => {
+            const generator = new ManifestGenerator({ 
+                tsConfigPath,
+                pluginPath: loggerPluginPath 
+            });
+            
+            const manifest = await generator.generateManifest();
+            
+            expect(manifest).toEqual({
+                name: 'SimpleLogger',
+                version: '1.0.0',
+                description: 'A simple logging plugin',
+                extensionPoints: [{
+                    id: 'logger',
+                    type: 'LoggerExtensionPoint'
+                }]
+            });
+        });
+
+        it('should throw error for multiple plugin classes in one file', async () => {
+            const generator = new ManifestGenerator({ 
+                tsConfigPath,
+                pluginPath: multiplePluginsPath 
+            });
+            
+            await expect(generator.generateManifest()).rejects.toThrow(
+                'Multiple plugin classes found in a single file'
+            );
         });
     });
 
-    describe('Collection Manifest', () => {
-        it('should generate collection manifest for multiple plugins', () => {
-            const generator = new ManifestGenerator(pluginPaths, fixturesDir);
-            const collection = generator.generateCollection({
-                name: '@composaic/plugin-test',
-                pluginSources: [{
-                    sourcePath: pluginPaths[0],
-                    remote: {
-                        name: 'TestPlugins',
-                        bundleFile: 'TestPlugins.js'
+    describe('generateCollection', () => {
+        it('should generate collection manifest for multiple plugins', async () => {
+            const generator = new ManifestGenerator({ 
+                tsConfigPath,
+                pluginPath: navbarPluginPath 
+            });
+
+            const collection = await generator.generateCollection({
+                name: '@composaic/test-plugins',
+                pluginSources: [
+                    {
+                        sourcePath: navbarPluginPath,
+                        remote: {
+                            url: 'https://plugins.composaic.dev/navbar',
+                            bundleFile: 'navbar.js'
+                        }
+                    },
+                    {
+                        sourcePath: loggerPluginPath,
+                        remote: {
+                            url: 'https://plugins.composaic.dev/logger',
+                            bundleFile: 'logger.js'
+                        }
                     }
-                }, {
-                    sourcePath: pluginPaths[1],
-                    remote: {
-                        name: 'TestPlugins',
-                        bundleFile: 'TestPlugins.js'
-                    }
-                }],
+                ],
                 projectPath: fixturesDir
             });
 
             expect(collection).toEqual({
-                name: '@composaic/plugin-test',
-                plugins: [{
-                    remote: {
-                        name: 'TestPlugins',
-                        bundleFile: 'TestPlugins.js'
-                    },
-                    definitions: [{
-                        plugin: '@composaic-tests/navbar',
-                        version: '1.0',
-                        description: 'Extension for the @composaic/navbar plugin',
-                        load: 'deferred',
-                        package: 'navbar',
-                        module: 'NavbarExtension',
-                        extensions: [{
-                            plugin: '@composaic/navbar',
-                            id: 'navbarItem',
-                            className: 'NavbarItemExtension',
-                            meta: [{
-                                id: 'test.RemoteExamples',
-                                label: 'Remote Examples',
-                                mountAt: 'root.Profile',
-                                children: [{
-                                    label: 'Remote Example',
-                                    path: '/remoteexample',
-                                    component: 'RemoteExamplePage'
-                                }]
+                name: '@composaic/test-plugins',
+                plugins: [
+                    {
+                        remote: {
+                            url: 'https://plugins.composaic.dev/navbar',
+                            bundleFile: 'navbar.js'
+                        },
+                        definitions: [{
+                            name: 'NavbarExtension',
+                            version: '1.0.0',
+                            description: 'A navbar extension plugin',
+                            extensions: [{
+                                extensionPoint: {
+                                    id: 'navbar',
+                                    type: 'NavbarExtensionPoint'
+                                },
+                                implementation: 'CustomMenuItem'
                             }]
                         }]
-                    }]
-                }, {
-                    remote: {
-                        name: 'TestPlugins',
-                        bundleFile: 'TestPlugins.js'
                     },
-                    definitions: [{
-                        plugin: '@composaic-tests/simple-logger',
-                        version: '1.0',
-                        description: 'Simple extension for the Composaic Logger Plugin',
-                        package: 'simplelogger',
-                        module: 'SimpleLogger',
-                        extensions: [{
-                            plugin: '@composaic/logger',
-                            id: 'logger',
-                            className: 'SimpleLoggerExtension'
+                    {
+                        remote: {
+                            url: 'https://plugins.composaic.dev/logger',
+                            bundleFile: 'logger.js'
+                        },
+                        definitions: [{
+                            name: 'SimpleLogger',
+                            version: '1.0.0',
+                            description: 'A simple logging plugin'
                         }]
-                    }]
-                }]
+                    }
+                ]
             });
         });
     });
