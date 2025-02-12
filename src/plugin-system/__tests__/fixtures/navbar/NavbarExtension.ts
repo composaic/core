@@ -18,8 +18,7 @@ export interface NavbarItem {
     description: 'Extension for the @composaic/navbar plugin',
     load: 'deferred',
     package: 'navbar',
-    module: 'NavbarExtension',
-    class: 'NavbarExtensionPlugin'
+    module: 'NavbarExtension'
 })
 @ExtensionMetadata({
     plugin: '@composaic/navbar',

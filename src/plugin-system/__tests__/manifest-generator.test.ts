@@ -74,7 +74,6 @@ describe('ManifestGenerator', () => {
                         load: 'deferred',
                         package: 'navbar',
                         module: 'NavbarExtension',
-                        class: 'NavbarExtensionPlugin',
                         extensions: [{
                             plugin: '@composaic/navbar',
                             id: 'navbarItem',
@@ -102,7 +101,6 @@ describe('ManifestGenerator', () => {
                         description: 'Simple extension for the Composaic Logger Plugin',
                         package: 'simplelogger',
                         module: 'SimpleLogger',
-                        class: 'SimpleLoggerPlugin',
                         extensions: [{
                             plugin: '@composaic/logger',
                             id: 'logger',

@@ -13,8 +13,7 @@ interface LogMessage {
     version: '1.0',
     description: 'Simple extension for the Composaic Logger Plugin',
     package: 'simplelogger',
-    module: 'SimpleLogger',
-    class: 'SimpleLoggerPlugin'
+    module: 'SimpleLogger'
 })
 @ExtensionPointMetadata([{
     id: 'logger',

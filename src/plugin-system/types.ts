@@ -38,23 +38,21 @@ export interface ExtensionMetadata {
  * Contains all necessary information to load and initialize a plugin.
  */
 export interface PluginMetadataType {
-    /** Plugin identifier (e.g., "@composaic-tests/navbar") */
-    plugin: string;    
+    /** Unique identifier for the plugin */
+    plugin: string;
     /** Plugin version */
     version: string;
-    /** Optional plugin description */
+    /** Optional description of what the plugin does */
     description?: string;
-    /** Loading strategy: 'eager' loads immediately, 'deferred' loads on demand */
+    /** Loading strategy for the plugin */
     load?: 'eager' | 'deferred';
-    /** Package name (e.g., "navbar") */
-    package: string;   
-    /** Module name (e.g., "NavbarExtension") */
-    module: string;    
-    /** Class name (e.g., "NavbarExtensionPlugin") */
-    class: string;     
-    /** List of extensions provided by this plugin */
+    /** Package name */
+    package: string;
+    /** Module name */
+    module: string;
+    /** Extensions provided by this plugin */
     extensions?: ExtensionMetadata[];
-    /** List of extension points provided by this plugin */
+    /** Extension points provided by this plugin */
     extensionPoints?: ExtensionPointMetadata[];
 }
 

@@ -155,13 +155,8 @@ export class ManifestGenerator {
             throw new Error(`Could not load source file: ${options.sourcePath}`);
         }
 
-        const pluginClass = this.findPluginClass(sourceFile);
+        const { pluginClass, metadata } = this.findPluginClass(sourceFile);
         if (!pluginClass) {
-            return null;
-        }
-
-        const metadata = this.extractMetadata(pluginClass);
-        if (!metadata) {
             return null;
         }
 
@@ -188,8 +183,8 @@ export class ManifestGenerator {
                 };
             }
             
-            // Remove extensionPoints from collection manifest
-            const { extensionPoints, ...manifestWithoutExtensionPoints } = manifest;
+            // Only remove extensionPoints from collection manifest
+            const { extensionPoints: _, ...manifestWithoutExtensionPoints } = manifest;
             
             return {
                 remote: source.remote,
@@ -207,172 +202,135 @@ export class ManifestGenerator {
      * Finds a plugin class in a source file
      * 
      * @param sourceFile Source file instance
-     * @returns Plugin class instance or null if not found
+     * @returns Plugin class instance and metadata or null if not found
      */
-    private findPluginClass(sourceFile: ts.SourceFile): ts.ClassDeclaration | null {
-        let pluginClasses: ts.ClassDeclaration[] = [];
-        console.log(`Searching for plugin class in ${sourceFile.fileName}`);
-
+    private findPluginClass(sourceFile: ts.SourceFile): { pluginClass: ts.ClassDeclaration, metadata: PluginMetadataType } {
+        const pluginClasses: { pluginClass: ts.ClassDeclaration, metadata: PluginMetadataType }[] = [];
+        
         const visit = (node: ts.Node) => {
-            if (ts.isClassDeclaration(node)) {
-                console.log(`Found class: ${node.name?.getText()}`);
-                if (this.hasPluginDecorator(node)) {
-                    console.log(`Found plugin class: ${node.name?.getText()}`);
-                    pluginClasses.push(node);
+            if (ts.isClassDeclaration(node) && node.name) {
+                console.log(`Found class: ${node.name.text}`);
+                
+                // Check if class has @PluginMetadata decorator
+                const pluginMetadata = this.getPluginMetadata(node);
+                if (pluginMetadata) {
+                    console.log(`Found plugin class: ${node.name.text}`);
+                    pluginClasses.push({ 
+                        pluginClass: node,
+                        metadata: pluginMetadata
+                    });
                 }
             }
             ts.forEachChild(node, visit);
         };
 
-        ts.forEachChild(sourceFile, visit);
-        
+        visit(sourceFile);
+
         if (pluginClasses.length > 1) {
-            const classNames = pluginClasses.map(c => c.name?.getText()).join(', ');
-            throw new Error(
-                `Multiple plugin classes found in ${sourceFile.fileName}. ` +
-                `Found plugins: ${classNames}. Each plugin should be in its own file. ` +
-                `Note: Extension classes (those without @PluginMetadata) can coexist with a plugin.`
-            );
+            const classNames = pluginClasses.map(pc => pc.pluginClass.name?.text).join(', ');
+            throw new Error(`Multiple plugin classes found in a single file: ${classNames}. Only one plugin class per file is allowed.`);
         }
 
-        return pluginClasses[0] || null;
+        if (pluginClasses.length === 0) {
+            throw new Error(`No plugin class found in ${sourceFile.fileName}`);
+        }
+
+        return pluginClasses[0];
     }
 
     /**
-     * Checks if a class has the @PluginMetadata decorator
+     * Gets the plugin metadata from a class declaration
      * 
      * @param node Class declaration instance
-     * @returns True if the class has the @PluginMetadata decorator, false otherwise
+     * @returns Plugin metadata instance or undefined if not found
      */
-    private hasPluginDecorator(node: ts.ClassDeclaration): boolean {
-        if (!ts.canHaveDecorators(node)) return false;
+    private getPluginMetadata(node: ts.ClassDeclaration): PluginMetadataType | undefined {
+        if (!ts.canHaveDecorators(node)) return undefined;
         const decorators = ts.getDecorators(node);
-        if (!decorators) return false;
+        if (!decorators) return undefined;
 
-        const pluginDecorator = decorators.find((decorator: ts.Decorator) => {
-            const expression = decorator.expression;
-            if (!ts.isCallExpression(expression)) return false;
+        let pluginMetadata: Partial<PluginMetadataType> | undefined;
+        let extensionMetadata: any | undefined;
+
+        for (const decorator of decorators) {
+            if (!ts.isCallExpression(decorator.expression)) continue;
+
+            const signature = this.typeChecker.getResolvedSignature(decorator.expression);
+            if (!signature) continue;
+
+            const declaration = signature.declaration;
+            if (!declaration || !ts.isMethodDeclaration(declaration) && !ts.isFunctionDeclaration(declaration)) continue;
+
+            const name = declaration.name?.getText();
+            if (name !== 'PluginMetadata' && name !== 'ExtensionMetadata') continue;
+
+            const arg = decorator.expression.arguments[0];
+            if (!ts.isObjectLiteralExpression(arg)) continue;
+
+            const metadata: any = {};
             
-            const identifier = expression.expression;
-            if (!ts.isIdentifier(identifier)) return false;
-            
-            return identifier.text === 'PluginMetadata';
-        });
+            for (const prop of arg.properties) {
+                if (!ts.isPropertyAssignment(prop)) continue;
+                
+                const propName = prop.name.getText();
+                const propValue = prop.initializer;
+                
+                if (ts.isStringLiteral(propValue)) {
+                    metadata[propName] = propValue.text;
+                } else if (ts.isArrayLiteralExpression(propValue)) {
+                    metadata[propName] = this.parseArrayLiteral(propValue);
+                } else if (ts.isObjectLiteralExpression(propValue)) {
+                    metadata[propName] = this.parseObjectLiteral(propValue);
+                }
+            }
 
-        return !!pluginDecorator;
-    }
-
-    /**
-     * Extracts metadata from a plugin class
-     * 
-     * @param classNode Plugin class instance
-     * @returns Plugin metadata instance or null if extraction fails
-     */
-    private extractMetadata(classNode: ts.ClassDeclaration): PluginMetadataType | null {
-        if (!ts.canHaveDecorators(classNode)) return null;
-        const decorators = ts.getDecorators(classNode);
-        if (!decorators) return null;
-
-        // Find the @PluginMetadata decorator
-        const pluginDecorator = decorators.find((decorator: ts.Decorator) => {
-            const expression = decorator.expression;
-            if (!ts.isCallExpression(expression)) return false;
-            
-            const identifier = expression.expression;
-            if (!ts.isIdentifier(identifier)) return false;
-            
-            return identifier.text === 'PluginMetadata';
-        });
-
-        if (!pluginDecorator) return null;
-
-        // Get the plugin metadata from the decorator arguments
-        const decoratorCall = pluginDecorator.expression as ts.CallExpression;
-        const arg = decoratorCall.arguments[0];
-        if (!ts.isObjectLiteralExpression(arg)) return null;
-
-        // Extract the plugin metadata
-        const metadata = this.extractObjectLiteral(arg) as PluginMetadataType;
-
-        // Find the @ExtensionMetadata decorator
-        const extensionDecorator = decorators.find((decorator: ts.Decorator) => {
-            const expression = decorator.expression;
-            if (!ts.isCallExpression(expression)) return false;
-            
-            const identifier = expression.expression;
-            if (!ts.isIdentifier(identifier)) return false;
-            
-            return identifier.text === 'ExtensionMetadata';
-        });
-
-        if (extensionDecorator) {
-            const extensionCall = extensionDecorator.expression as ts.CallExpression;
-            const extensionArg = extensionCall.arguments[0];
-            if (ts.isObjectLiteralExpression(extensionArg)) {
-                const extensionMetadata = this.extractObjectLiteral(extensionArg);
-                metadata.extensions = [extensionMetadata];
+            if (name === 'PluginMetadata') {
+                pluginMetadata = metadata;
+            } else if (name === 'ExtensionMetadata') {
+                extensionMetadata = metadata;
             }
         }
 
-        // Find the @ExtensionPointMetadata decorator
-        const extensionPointDecorator = decorators.find((decorator: ts.Decorator) => {
-            const expression = decorator.expression;
-            if (!ts.isCallExpression(expression)) return false;
-            
-            const identifier = expression.expression;
-            if (!ts.isIdentifier(identifier)) return false;
-            
-            return identifier.text === 'ExtensionPointMetadata';
-        });
+        if (!pluginMetadata) return undefined;
 
-        if (extensionPointDecorator) {
-            const extensionPointCall = extensionPointDecorator.expression as ts.CallExpression;
-            const extensionPointArg = extensionPointCall.arguments[0];
-            if (ts.isArrayLiteralExpression(extensionPointArg)) {
-                metadata.extensionPoints = extensionPointArg.elements
-                    .filter(ts.isObjectLiteralExpression)
-                    .map(element => this.extractObjectLiteral(element));
-            }
+        if (extensionMetadata) {
+            pluginMetadata.extensions = [extensionMetadata];
         }
 
-        return metadata;
+        return pluginMetadata as PluginMetadataType;
     }
 
-    /**
-     * Extracts an object literal expression
-     * 
-     * @param node Object literal expression instance
-     * @returns Extracted object literal
-     */
-    private extractObjectLiteral(node: ts.ObjectLiteralExpression): any {
+    private parseArrayLiteral(array: ts.ArrayLiteralExpression): any[] {
+        return array.elements.map(element => {
+            if (ts.isObjectLiteralExpression(element)) {
+                return this.parseObjectLiteral(element);
+            } else if (ts.isStringLiteral(element)) {
+                return element.text;
+            } else if (ts.isNumericLiteral(element)) {
+                return Number(element.text);
+            }
+            return null;
+        }).filter(Boolean);
+    }
+
+    private parseObjectLiteral(obj: ts.ObjectLiteralExpression): any {
         const result: any = {};
-        
-        for (const property of node.properties) {
-            if (!ts.isPropertyAssignment(property)) continue;
+        for (const prop of obj.properties) {
+            if (!ts.isPropertyAssignment(prop)) continue;
             
-            const name = property.name.getText();
-            const initializer = property.initializer;
+            const propName = prop.name.getText();
+            const propValue = prop.initializer;
             
-            if (ts.isStringLiteral(initializer)) {
-                result[name] = initializer.text;
-            } else if (ts.isNumericLiteral(initializer)) {
-                result[name] = Number(initializer.text);
-            } else if (initializer.kind === ts.SyntaxKind.TrueKeyword) {
-                result[name] = true;
-            } else if (initializer.kind === ts.SyntaxKind.FalseKeyword) {
-                result[name] = false;
-            } else if (ts.isArrayLiteralExpression(initializer)) {
-                result[name] = initializer.elements.map(element => {
-                    if (ts.isObjectLiteralExpression(element)) {
-                        return this.extractObjectLiteral(element);
-                    }
-                    return null;
-                }).filter(Boolean);
-            } else if (ts.isObjectLiteralExpression(initializer)) {
-                result[name] = this.extractObjectLiteral(initializer);
+            if (ts.isStringLiteral(propValue)) {
+                result[propName] = propValue.text;
+            } else if (ts.isNumericLiteral(propValue)) {
+                result[propName] = Number(propValue.text);
+            } else if (ts.isArrayLiteralExpression(propValue)) {
+                result[propName] = this.parseArrayLiteral(propValue);
+            } else if (ts.isObjectLiteralExpression(propValue)) {
+                result[propName] = this.parseObjectLiteral(propValue);
             }
         }
-        
         return result;
     }
 

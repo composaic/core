@@ -6,8 +6,7 @@ import { PluginMetadata } from '../../../decorators.js';
     version: '1.0',
     description: 'First test plugin',
     package: 'multiplugins',
-    module: 'MultiplePlugins',
-    class: 'FirstPlugin'
+    module: 'MultiplePlugins'
 })
 export class FirstPlugin extends Plugin {
     async start() {
@@ -20,8 +19,7 @@ export class FirstPlugin extends Plugin {
     version: '1.0',
     description: 'Second test plugin',
     package: 'multiplugins',
-    module: 'MultiplePlugins',
-    class: 'SecondPlugin'
+    module: 'MultiplePlugins'
 })
 export class SecondPlugin extends Plugin {
     async start() {
