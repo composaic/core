@@ -1,3 +1,5 @@
+import 'reflect-metadata';
+
 /**
  * Plugin System Decorators
  * 
@@ -22,20 +24,23 @@ type Constructor = { new (...args: any[]): any };
  * @example
  * ```typescript
  * @PluginMetadata({
- *   name: 'NavbarExtension',
- *   version: '1.0.0',
- *   description: 'A navbar extension plugin'
+ *   plugin: '@composaic/navbar',
+ *   version: '0.1.0',
+ *   description: 'Navbar Plugin',
+ *   module: 'index',
+ *   package: 'navbar',
+ *   class: 'NavbarPlugin',
+ *   extensionPoints: [{
+ *     id: 'navbar',
+ *     type: 'NavbarExtensionPoint'
+ *   }]
  * })
  * class NavbarPlugin { }
  * ```
  */
 export function PluginMetadata(metadata: PluginMetadataType) {
     return function(target: Constructor) {
-        Object.defineProperty(target, 'pluginMetadata', {
-            value: metadata,
-            writable: false
-        });
-        return target;
+        Reflect.defineMetadata('plugin:metadata', metadata, target);
     };
 }
 
@@ -49,19 +54,18 @@ export function PluginMetadata(metadata: PluginMetadataType) {
  * @example
  * ```typescript
  * @ExtensionMetadata({
- *   extensionPoint: 'navbar.menu',
- *   implementation: 'NavbarItemExtension'
+ *   plugin: 'self',
+ *   id: 'navbar',
+ *   className: 'CustomMenuItem'
  * })
- * class NavbarItemExtension { }
+ * class CustomMenuItem { }
  * ```
  */
 export function ExtensionMetadata(metadata: ExtensionMetadata) {
     return function(target: Constructor) {
-        Object.defineProperty(target, 'extensionMetadata', {
-            value: metadata,
-            writable: false
-        });
-        return target;
+        const existingMetadata = Reflect.getMetadata('extension:metadata', target) || [];
+        existingMetadata.push(metadata);
+        Reflect.defineMetadata('extension:metadata', existingMetadata, target);
     };
 }
 
@@ -74,7 +78,7 @@ export const Metadata = {
      * @returns Plugin metadata if present, undefined otherwise
      */
     getPluginMetadata(target: Constructor): PluginMetadataType | undefined {
-        return (target as any).pluginMetadata;
+        return Reflect.getMetadata('plugin:metadata', target);
     },
 
     /**
@@ -84,6 +88,6 @@ export const Metadata = {
      * @returns Array of extension metadata
      */
     getExtensionMetadata(target: Constructor): ExtensionMetadata[] {
-        return [(target as any).extensionMetadata].filter(Boolean);
+        return Reflect.getMetadata('extension:metadata', target) || [];
     }
 };

@@ -46,8 +46,6 @@ export interface PluginMetadataType {
     module: string;
     /** Package name */
     package: string;
-    /** Main class name */
-    class: string;
     /** Extension points provided by this plugin */
     extensionPoints?: ExtensionPointMetadata[];
     /** Extensions provided by this plugin */
@@ -59,6 +57,8 @@ export interface PluginMetadataType {
  * Represents a single plugin manifest file.
  */
 export interface PluginManifest extends PluginMetadataType {
+    /** Main class name */
+    class: string;
     /** Remote configuration for plugin loading */
     remote?: RemoteConfig;
 }

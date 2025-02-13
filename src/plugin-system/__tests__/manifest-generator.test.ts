@@ -119,7 +119,6 @@ describe('ManifestGenerator', () => {
                     description: 'Invalid Plugin',
                     module: 'index',
                     package: 'invalid',
-                    class: 'InvalidPlugin',
                     extensionPoints: [{
                         id: 'test',
                         type: 'TestExtensionPoint'

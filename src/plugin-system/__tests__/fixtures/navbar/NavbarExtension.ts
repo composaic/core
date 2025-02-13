@@ -12,7 +12,6 @@ interface MenuItem {
     description: 'Navbar Plugin',
     module: 'index',
     package: 'navbar',
-    class: 'NavbarPlugin',
     extensionPoints: [{
         id: 'navbar',
         type: 'NavbarExtensionPoint'

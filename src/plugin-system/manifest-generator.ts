@@ -88,7 +88,7 @@ export class ManifestGenerator {
     /**
      * Generate a manifest for a single plugin
      */
-    async generateManifest(): Promise<PluginMetadataType> {
+    async generateManifest(): Promise<PluginManifest> {
         const sourceFile = this.program.getSourceFile(this.options.pluginPath);
         if (!sourceFile) {
             throw new Error(`Could not load source file: ${this.options.pluginPath}`);
@@ -106,7 +106,11 @@ export class ManifestGenerator {
             metadata.extensions.push(...extensions);
         }
 
-        return metadata;
+        // Add class name from the plugin class itself
+        return {
+            ...metadata,
+            class: pluginClass.name?.text || ''
+        };
     }
 
     /**
@@ -138,7 +142,7 @@ export class ManifestGenerator {
             
             return {
                 remote: source.remote,
-                definitions: [shouldIncludeExtensions ? manifestWithoutExtensionPoints : manifestWithoutExtensions]
+                definitions: [shouldIncludeExtensions ? { ...manifestWithoutExtensionPoints, class: manifest.class } : { ...manifestWithoutExtensions, class: manifest.class }]
             };
         }));
 

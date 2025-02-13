@@ -6,7 +6,6 @@ import { PluginMetadata, ExtensionMetadata } from '../../../decorators';
     description: 'Logger Plugin',
     module: 'index',
     package: 'logger',
-    class: 'LoggerPlugin',
     extensionPoints: [{
         id: 'logger',
         type: 'LoggerExtensionPoint'

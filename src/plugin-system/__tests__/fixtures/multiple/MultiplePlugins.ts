@@ -1,9 +1,11 @@
 import { PluginMetadata } from '../../../decorators';
 
 @PluginMetadata({
-    name: 'Plugin1',
-    version: '1.0.0',
-    description: 'First plugin'
+    plugin: '@composaic/plugin1',
+    version: '0.1.0',
+    description: 'First Plugin',
+    module: 'index',
+    package: 'plugin1'
 })
 export class Plugin1 {
     doSomething(): void {
@@ -12,9 +14,11 @@ export class Plugin1 {
 }
 
 @PluginMetadata({
-    name: 'Plugin2',
-    version: '1.0.0',
-    description: 'Second plugin'
+    plugin: '@composaic/plugin2',
+    version: '0.1.0',
+    description: 'Second Plugin',
+    module: 'index',
+    package: 'plugin2'
 })
 export class Plugin2 {
     doSomething(): void {
