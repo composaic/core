@@ -7,15 +7,18 @@ interface MenuItem {
 }
 
 @PluginMetadata({
-    name: 'NavbarExtension',
-    version: '1.0.0',
-    description: 'A navbar extension plugin',
+    plugin: '@composaic/navbar',
+    version: '0.1.0',
+    description: 'Navbar Plugin',
+    module: 'index',
+    package: 'navbar',
+    class: 'NavbarPlugin',
     extensionPoints: [{
         id: 'navbar',
         type: 'NavbarExtensionPoint'
     }]
 })
-export class NavbarExtension {
+export class NavbarPlugin {
     items: MenuItem[] = [];
 
     addItem(item: MenuItem): void {
@@ -24,11 +27,9 @@ export class NavbarExtension {
 }
 
 @ExtensionMetadata({
-    extensionPoint: {
-        id: 'navbar',
-        type: 'NavbarExtensionPoint'
-    },
-    implementation: 'CustomMenuItem'
+    plugin: 'self',
+    id: 'navbar',
+    className: 'CustomMenuItem'
 })
 export class CustomMenuItem implements MenuItem {
     constructor(

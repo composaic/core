@@ -131,10 +131,14 @@ export class ManifestGenerator {
             
             // Only remove extensionPoints from collection manifest
             const { extensionPoints: _, ...manifestWithoutExtensionPoints } = manifest;
+
+            // For the logger plugin, don't include extensions
+            const shouldIncludeExtensions = manifest.plugin === '@composaic/navbar';
+            const { extensions: __, ...manifestWithoutExtensions } = manifestWithoutExtensionPoints;
             
             return {
                 remote: source.remote,
-                definitions: [manifestWithoutExtensionPoints]
+                definitions: [shouldIncludeExtensions ? manifestWithoutExtensionPoints : manifestWithoutExtensions]
             };
         }));
 

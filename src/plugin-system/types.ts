@@ -21,8 +21,12 @@ export interface ExtensionPointMetadata {
  * Represents a concrete implementation of an extension point by a plugin.
  */
 export interface ExtensionMetadata {
+    /** Plugin providing this extension */
+    plugin: string;
     /** ID of the extension point being implemented */
-    extensionPoint: ExtensionPointMetadata;
+    id: string;
+    /** Name of the implementing class */
+    className: string;
     /** Additional extension-specific metadata */
     [key: string]: any;
 }
@@ -32,14 +36,18 @@ export interface ExtensionMetadata {
  * Defines the metadata for a plugin, including its name, version, and dependencies.
  */
 export interface PluginMetadataType {
-    /** Name of the plugin */
-    name: string;
+    /** Plugin identifier */
+    plugin: string;
     /** Version of the plugin */
     version: string;
     /** Description of the plugin */
     description?: string;
-    /** Author of the plugin */
-    author?: string;
+    /** Module name */
+    module: string;
+    /** Package name */
+    package: string;
+    /** Main class name */
+    class: string;
     /** Extension points provided by this plugin */
     extensionPoints?: ExtensionPointMetadata[];
     /** Extensions provided by this plugin */

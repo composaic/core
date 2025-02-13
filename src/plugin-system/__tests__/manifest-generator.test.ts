@@ -18,19 +18,20 @@ describe('ManifestGenerator', () => {
             const manifest = await generator.generateManifest();
             
             expect(manifest).toEqual({
-                name: 'NavbarExtension',
-                version: '1.0.0',
-                description: 'A navbar extension plugin',
+                plugin: '@composaic/navbar',
+                version: '0.1.0',
+                description: 'Navbar Plugin',
+                module: 'index',
+                package: 'navbar',
+                class: 'NavbarPlugin',
                 extensionPoints: [{
                     id: 'navbar',
                     type: 'NavbarExtensionPoint'
                 }],
                 extensions: [{
-                    extensionPoint: {
-                        id: 'navbar',
-                        type: 'NavbarExtensionPoint'
-                    },
-                    implementation: 'CustomMenuItem'
+                    plugin: 'self',
+                    id: 'navbar',
+                    className: 'CustomMenuItem'
                 }]
             });
         });
@@ -44,12 +45,20 @@ describe('ManifestGenerator', () => {
             const manifest = await generator.generateManifest();
             
             expect(manifest).toEqual({
-                name: 'SimpleLogger',
-                version: '1.0.0',
-                description: 'A simple logging plugin',
+                plugin: '@composaic/logger',
+                version: '0.1.0',
+                description: 'Logger Plugin',
+                module: 'index',
+                package: 'logger',
+                class: 'LoggerPlugin',
                 extensionPoints: [{
                     id: 'logger',
                     type: 'LoggerExtensionPoint'
+                }],
+                extensions: [{
+                    plugin: 'self',
+                    id: 'logger',
+                    className: 'SimpleLoggerExtension'
                 }]
             });
         });
@@ -103,15 +112,16 @@ describe('ManifestGenerator', () => {
                             bundleFile: 'navbar.js'
                         },
                         definitions: [{
-                            name: 'NavbarExtension',
-                            version: '1.0.0',
-                            description: 'A navbar extension plugin',
+                            plugin: '@composaic/navbar',
+                            version: '0.1.0',
+                            description: 'Navbar Plugin',
+                            module: 'index',
+                            package: 'navbar',
+                            class: 'NavbarPlugin',
                             extensions: [{
-                                extensionPoint: {
-                                    id: 'navbar',
-                                    type: 'NavbarExtensionPoint'
-                                },
-                                implementation: 'CustomMenuItem'
+                                plugin: 'self',
+                                id: 'navbar',
+                                className: 'CustomMenuItem'
                             }]
                         }]
                     },
@@ -121,9 +131,12 @@ describe('ManifestGenerator', () => {
                             bundleFile: 'logger.js'
                         },
                         definitions: [{
-                            name: 'SimpleLogger',
-                            version: '1.0.0',
-                            description: 'A simple logging plugin'
+                            plugin: '@composaic/logger',
+                            version: '0.1.0',
+                            description: 'Logger Plugin',
+                            module: 'index',
+                            package: 'logger',
+                            class: 'LoggerPlugin'
                         }]
                     }
                 ]

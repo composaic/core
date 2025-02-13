@@ -1,15 +1,29 @@
-import { PluginMetadata } from '../../../decorators';
+import { PluginMetadata, ExtensionMetadata } from '../../../decorators';
 
 @PluginMetadata({
-    name: 'SimpleLogger',
-    version: '1.0.0',
-    description: 'A simple logging plugin',
+    plugin: '@composaic/logger',
+    version: '0.1.0',
+    description: 'Logger Plugin',
+    module: 'index',
+    package: 'logger',
+    class: 'LoggerPlugin',
     extensionPoints: [{
         id: 'logger',
         type: 'LoggerExtensionPoint'
     }]
 })
-export class SimpleLogger {
+export class LoggerPlugin {
+    log(message: string): void {
+        console.log(`[Logger] ${message}`);
+    }
+}
+
+@ExtensionMetadata({
+    plugin: 'self',
+    id: 'logger',
+    className: 'SimpleLoggerExtension'
+})
+export class SimpleLoggerExtension {
     log(message: string): void {
         console.log(`[SimpleLogger] ${message}`);
     }
