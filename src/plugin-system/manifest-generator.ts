@@ -180,8 +180,19 @@ export class ManifestGenerator {
 
         const visit = (node: ts.Node) => {
             if (ts.isClassDeclaration(node)) {
-                const classExtensions = this.getExtensionMetadata(node);
-                extensions.push(...classExtensions);
+                // Check if this class has PluginMetadata
+                const pluginMetadata = this.getPluginMetadata(node);
+                if (pluginMetadata) {
+                    // Check if it also has ExtensionMetadata
+                    const extensionMetadata = this.getExtensionMetadata(node);
+                    if (extensionMetadata.length > 0) {
+                        throw new Error(`Plugin class '${node.name?.text}' cannot have both @PluginMetadata and @ExtensionMetadata decorators`);
+                    }
+                } else {
+                    // Only collect extension metadata from non-plugin classes
+                    const classExtensions = this.getExtensionMetadata(node);
+                    extensions.push(...classExtensions);
+                }
             }
             ts.forEachChild(node, visit);
         };
