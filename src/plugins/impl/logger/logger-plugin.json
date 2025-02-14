@@ -4,7 +4,6 @@
     "description": "Logger Plugin",
     "module": "index",
     "package": "logger",
-    "class": "LoggerPlugin",
     "extensionPoints": [
         {
             "id": "logger",
@@ -17,5 +16,6 @@
             "id": "logger",
             "className": "SimpleLoggerExtension"
         }
-    ]
+    ],
+    "class": "LoggerPlugin"
 }

@@ -20,6 +20,9 @@
         "type": "git",
         "url": "https://github.com/composaic/core.git"
     },
+    "bin": {
+        "manifest-gen": "./dist/cjs/plugin-system/cli.js"
+    },
     "scripts": {
         "build:cjs": "tsc -p tsconfig.cjs.json",
         "build:esm": "tsc -p tsconfig.esm.json && npm run rename:esm",
@@ -34,7 +37,8 @@
         "test": "jest",
         "test:watch": "jest --watch",
         "prettier": "prettier --write .",
-        "build-old": "npx tsc && npm run compile-scss && npm run replace-scss-imports && npm run prettier"
+        "build-old": "npx tsc && npm run compile-scss && npm run replace-scss-imports && npm run prettier",
+        "manifest-gen": "node ./dist/cjs/plugin-system/cli.js"
     },
     "keywords": [
         "nodejs",
@@ -62,6 +66,7 @@
         "@types/jest": "^29.5.12",
         "babel-jest": "^29.7.0",
         "babel-plugin-module-resolver": "^5.0.2",
+        "commander": "^13.1.0",
         "concurrently": "^8.2.2",
         "eslint": "^9.10.0",
         "eslint-config-prettier": "^9.1.0",

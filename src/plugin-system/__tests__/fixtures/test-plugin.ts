@@ -1,13 +1,5 @@
 import { Plugin } from '../../../plugins/types';
-import { PluginMetadata, ExtensionPointMetadata, ExtensionMetadata } from '../../decorators';
-
-@ExtensionPointMetadata({
-    id: 'test.extension',
-    description: 'Test extension point'
-})
-export class TestExtensionPoint {
-    doSomething(): void {}
-}
+import { PluginMetadata, ExtensionMetadata } from '../../decorators';
 
 @PluginMetadata({
     plugin: '@composaic-tests/test-plugin',
@@ -15,12 +7,17 @@ export class TestExtensionPoint {
     description: 'Test plugin for testing plugin system',
     package: 'test-plugin',
     module: 'TestPlugin',
-    class: 'TestPlugin'
+    extensionPoints: [
+        {
+            id: 'test.extension',
+            type: 'TestExtensionPoint',
+        },
+    ],
 })
 @ExtensionMetadata({
     plugin: '@composaic/core',
     id: 'logger',
-    className: 'TestLoggerExtension'
+    className: 'TestLoggerExtension',
 })
 export class TestPlugin extends Plugin {
     async start() {

@@ -10,3 +10,10 @@ export {
 export { PluginManager } from './plugins/PluginManager.js';
 export { Configuration } from './services/configuration.js';
 export { addLocalPlugins } from './dev/plugin-utils.js';
+
+// Plugin System Decorators
+export {
+    PluginMetadata,
+    ExtensionMetadata,
+    Metadata,
+} from './plugin-system/decorators.js';

@@ -1,4 +1,8 @@
 import { Plugin } from '../../types.js';
+import {
+    PluginMetadata,
+    ExtensionMetadata,
+} from '../../../plugin-system/decorators.js';
 import { PluginManager } from '../../PluginManager.js';
 
 export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
@@ -25,6 +29,19 @@ export interface LoggerExtensionPoint {
     setLogCallback(log: (message: LogMessage) => void): void;
 }
 
+@PluginMetadata({
+    plugin: '@composaic/logger',
+    version: '0.1.0',
+    description: 'Logger Plugin',
+    module: 'index',
+    package: 'logger',
+    extensionPoints: [
+        {
+            id: 'logger',
+            type: 'LoggerExtensionPoint',
+        },
+    ],
+})
 export class LoggerPlugin extends Plugin {
     async start() {
         super.start();
@@ -54,6 +71,11 @@ export class LoggerPlugin extends Plugin {
     }
 }
 
+@ExtensionMetadata({
+    plugin: 'self',
+    id: 'logger',
+    className: 'SimpleLoggerExtension',
+})
 export class SimpleLoggerExtension implements LoggerExtensionPoint {
     private log?: (message: LogMessage) => void;
     getSubSystemName(): string {
