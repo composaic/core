@@ -147,15 +147,14 @@ program
     .description('Generate plugin manifests from TypeScript decorators')
     .version('0.1.0');
 
-program
-    .command('generate')
+const generateCommand = new Command('generate')
     .description('Generate plugin manifests')
     .option('-c, --config <path>', 'path to configuration file')
     .option('-p, --plugin <path>', 'plugin source path (single plugin mode)')
     .option('-t, --type <type>', 'plugin type (system or application)')
     .option('-o, --output <path>', 'output path for manifest')
     .option('--collection <glob>', 'glob pattern for collection plugins')
-    .option('-n, --name <name>', 'collection name')
+    .option('--collection-name <name>', 'collection name')
     .option('--tsconfig <path>', 'path to tsconfig.json', 'tsconfig.json')
     .option('-f, --force', 'force regeneration even if up to date')
     .action(async (options: GenerateOptions) => {
@@ -189,8 +188,7 @@ program
         }
     });
 
-program
-    .command('watch')
+const watchCommand = new Command('watch')
     .description('Watch for changes and regenerate manifests')
     .option('-c, --config <path>', 'path to configuration file')
     .option('--tsconfig <path>', 'path to tsconfig.json', 'tsconfig.json')
@@ -208,4 +206,4 @@ program
         // Watch mode implementation will be added in next phase
     });
 
-program.parse();
+program.addCommand(generateCommand).addCommand(watchCommand).parse();
