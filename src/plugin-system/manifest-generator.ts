@@ -1,6 +1,6 @@
 /**
  * Plugin Manifest Generator
- * 
+ *
  * This module provides functionality to generate plugin manifests by analyzing TypeScript source files.
  * It uses the TypeScript Compiler API to extract metadata from plugin classes decorated with @PluginMetadata.
  */
@@ -8,7 +8,13 @@
 import * as ts from 'typescript';
 import * as path from 'path';
 import * as fs from 'fs';
-import { PluginManifest, PluginMetadataType, CollectionManifest, RemoteConfig, ExtensionMetadata } from './types';
+import {
+    PluginManifest,
+    PluginMetadataType,
+    CollectionManifest,
+    RemoteConfig,
+    ExtensionMetadata,
+} from './types';
 import { Metadata } from './decorators';
 
 /**
@@ -18,15 +24,15 @@ export interface GenerateOptions {
     /**
      * Path to the plugin source file
      */
-    sourcePath: string;      
+    sourcePath: string;
     /**
      * Where to write the manifest (defaults to next to source)
      */
-    outputPath?: string;     
+    outputPath?: string;
     /**
      * Root of the project (for relative paths)
      */
-    projectPath?: string;    
+    projectPath?: string;
 }
 
 /**
@@ -36,11 +42,11 @@ export interface GenerateCollectionOptions {
     /**
      * Collection name (e.g., "@composaic/plugin-test")
      */
-    name: string;           
+    name: string;
     /**
      * Array of plugin source files or directories
      */
-    pluginSources: {        
+    pluginSources: {
         /**
          * Path to the plugin source file
          */
@@ -53,7 +59,7 @@ export interface GenerateCollectionOptions {
     /**
      * Root project path for relative paths
      */
-    projectPath?: string;   
+    projectPath?: string;
 }
 
 /**
@@ -80,7 +86,7 @@ export class ManifestGenerator {
         // Create program instance
         this.program = ts.createProgram({
             rootNames: [options.pluginPath],
-            options: parsedConfig.options
+            options: parsedConfig.options,
         });
         this.typeChecker = this.program.getTypeChecker();
     }
@@ -91,13 +97,37 @@ export class ManifestGenerator {
     async generateManifest(): Promise<PluginManifest> {
         const sourceFile = this.program.getSourceFile(this.options.pluginPath);
         if (!sourceFile) {
-            throw new Error(`Could not load source file: ${this.options.pluginPath}`);
+            throw new Error(
+                `Could not load source file: ${this.options.pluginPath}`
+            );
         }
 
-        const { pluginClass, metadata } = this.findPluginClass(sourceFile);
-        if (!pluginClass || !metadata) {
+        console.log('Analyzing source file:', this.options.pluginPath);
+        const result = this.findPluginClass(sourceFile);
+        console.log('Found plugin classes:', result ? 'yes' : 'no');
+
+        if (!result) {
+            console.log('Available classes:');
+            sourceFile.forEachChild((node) => {
+                if (ts.isClassDeclaration(node) && node.name) {
+                    console.log('- Class:', node.name.text);
+                    const decorators = ts.getDecorators(node);
+                    if (decorators) {
+                        console.log(
+                            '  Decorators:',
+                            decorators
+                                .map((d: ts.Decorator) =>
+                                    d.expression.getText()
+                                )
+                                .join(', ')
+                        );
+                    }
+                }
+            });
             throw new Error('No plugin class found');
         }
+
+        const { pluginClass, metadata } = result;
 
         // Get extension metadata from all classes in the file
         const extensions = this.findAllExtensionMetadata(sourceFile);
@@ -109,51 +139,76 @@ export class ManifestGenerator {
         // Add class name from the plugin class itself
         return {
             ...metadata,
-            class: pluginClass.name?.text || ''
+            class: pluginClass.name?.text || '',
         };
     }
 
     /**
      * Generates a collection manifest for multiple plugins
      */
-    async generateCollection(options: GenerateCollectionOptions): Promise<CollectionManifest> {
-        const plugins = await Promise.all(options.pluginSources.map(async source => {
-            // Create a new generator for each plugin
-            const generator = new ManifestGenerator({
-                tsConfigPath: this.options.tsConfigPath,
-                pluginPath: source.sourcePath
-            });
-            
-            const manifest = await generator.generateManifest();
-            
-            if (!manifest) {
+    async generateCollection(
+        options: GenerateCollectionOptions
+    ): Promise<CollectionManifest> {
+        const plugins = await Promise.all(
+            options.pluginSources.map(async (source) => {
+                // Create a new generator for each plugin
+                const generator = new ManifestGenerator({
+                    tsConfigPath: this.options.tsConfigPath,
+                    pluginPath: source.sourcePath,
+                });
+
+                const manifest = await generator.generateManifest();
+
+                if (!manifest) {
+                    return {
+                        remote: source.remote,
+                        definitions: [],
+                    };
+                }
+
+                // Only remove extensionPoints from collection manifest
+                const {
+                    extensionPoints: _,
+                    ...manifestWithoutExtensionPoints
+                } = manifest;
+
+                // For the logger plugin, don't include extensions
+                const shouldIncludeExtensions =
+                    manifest.plugin === '@composaic/navbar';
+                const { extensions: __, ...manifestWithoutExtensions } =
+                    manifestWithoutExtensionPoints;
+
                 return {
                     remote: source.remote,
-                    definitions: []
+                    definitions: [
+                        shouldIncludeExtensions
+                            ? {
+                                  ...manifestWithoutExtensionPoints,
+                                  class: manifest.class,
+                              }
+                            : {
+                                  ...manifestWithoutExtensions,
+                                  class: manifest.class,
+                              },
+                    ],
                 };
-            }
-            
-            // Only remove extensionPoints from collection manifest
-            const { extensionPoints: _, ...manifestWithoutExtensionPoints } = manifest;
-
-            // For the logger plugin, don't include extensions
-            const shouldIncludeExtensions = manifest.plugin === '@composaic/navbar';
-            const { extensions: __, ...manifestWithoutExtensions } = manifestWithoutExtensionPoints;
-            
-            return {
-                remote: source.remote,
-                definitions: [shouldIncludeExtensions ? { ...manifestWithoutExtensionPoints, class: manifest.class } : { ...manifestWithoutExtensions, class: manifest.class }]
-            };
-        }));
+            })
+        );
 
         return {
             name: options.name,
-            plugins
+            plugins,
         };
     }
 
-    private findPluginClass(sourceFile: ts.SourceFile): { pluginClass: ts.ClassDeclaration; metadata: PluginMetadataType } {
-        const pluginClasses: { pluginClass: ts.ClassDeclaration; metadata: PluginMetadataType }[] = [];
+    private findPluginClass(sourceFile: ts.SourceFile): {
+        pluginClass: ts.ClassDeclaration;
+        metadata: PluginMetadataType;
+    } {
+        const pluginClasses: {
+            pluginClass: ts.ClassDeclaration;
+            metadata: PluginMetadataType;
+        }[] = [];
 
         const visit = (node: ts.Node) => {
             if (ts.isClassDeclaration(node) && node.name) {
@@ -168,8 +223,12 @@ export class ManifestGenerator {
         visit(sourceFile);
 
         if (pluginClasses.length > 1) {
-            const classNames = pluginClasses.map(pc => pc.pluginClass.name?.text).join(', ');
-            throw new Error(`Multiple plugin classes found in a single file: ${classNames}. Only one plugin class per file is allowed.`);
+            const classNames = pluginClasses
+                .map((pc) => pc.pluginClass.name?.text)
+                .join(', ');
+            throw new Error(
+                `Multiple plugin classes found in a single file: ${classNames}. Only one plugin class per file is allowed.`
+            );
         }
 
         if (pluginClasses.length === 0) {
@@ -179,7 +238,9 @@ export class ManifestGenerator {
         return pluginClasses[0];
     }
 
-    private findAllExtensionMetadata(sourceFile: ts.SourceFile): ExtensionMetadata[] {
+    private findAllExtensionMetadata(
+        sourceFile: ts.SourceFile
+    ): ExtensionMetadata[] {
         const extensions: ExtensionMetadata[] = [];
 
         const visit = (node: ts.Node) => {
@@ -190,7 +251,9 @@ export class ManifestGenerator {
                     // Check if it also has ExtensionMetadata
                     const extensionMetadata = this.getExtensionMetadata(node);
                     if (extensionMetadata.length > 0) {
-                        throw new Error(`Plugin class '${node.name?.text}' cannot have both @PluginMetadata and @ExtensionMetadata decorators`);
+                        throw new Error(
+                            `Plugin class '${node.name?.text}' cannot have both @PluginMetadata and @ExtensionMetadata decorators`
+                        );
                     }
                 } else {
                     // Only collect extension metadata from non-plugin classes
@@ -205,7 +268,9 @@ export class ManifestGenerator {
         return extensions;
     }
 
-    private getPluginMetadata(node: ts.ClassDeclaration): PluginMetadataType | undefined {
+    private getPluginMetadata(
+        node: ts.ClassDeclaration
+    ): PluginMetadataType | undefined {
         if (!ts.canHaveDecorators(node)) return undefined;
         const decorators = ts.getDecorators(node);
         if (!decorators) return undefined;
@@ -213,11 +278,18 @@ export class ManifestGenerator {
         for (const decorator of decorators) {
             if (!ts.isCallExpression(decorator.expression)) continue;
 
-            const signature = this.typeChecker.getResolvedSignature(decorator.expression);
+            const signature = this.typeChecker.getResolvedSignature(
+                decorator.expression
+            );
             if (!signature) continue;
 
             const declaration = signature.declaration;
-            if (!declaration || !ts.isMethodDeclaration(declaration) && !ts.isFunctionDeclaration(declaration)) continue;
+            if (
+                !declaration ||
+                (!ts.isMethodDeclaration(declaration) &&
+                    !ts.isFunctionDeclaration(declaration))
+            )
+                continue;
 
             const name = declaration.name?.getText();
             if (name !== 'PluginMetadata') continue;
@@ -231,7 +303,9 @@ export class ManifestGenerator {
         return undefined;
     }
 
-    private getExtensionMetadata(node: ts.ClassDeclaration): ExtensionMetadata[] {
+    private getExtensionMetadata(
+        node: ts.ClassDeclaration
+    ): ExtensionMetadata[] {
         if (!ts.canHaveDecorators(node)) return [];
         const decorators = ts.getDecorators(node);
         if (!decorators) return [];
@@ -241,11 +315,18 @@ export class ManifestGenerator {
         for (const decorator of decorators) {
             if (!ts.isCallExpression(decorator.expression)) continue;
 
-            const signature = this.typeChecker.getResolvedSignature(decorator.expression);
+            const signature = this.typeChecker.getResolvedSignature(
+                decorator.expression
+            );
             if (!signature) continue;
 
             const declaration = signature.declaration;
-            if (!declaration || !ts.isMethodDeclaration(declaration) && !ts.isFunctionDeclaration(declaration)) continue;
+            if (
+                !declaration ||
+                (!ts.isMethodDeclaration(declaration) &&
+                    !ts.isFunctionDeclaration(declaration))
+            )
+                continue;
 
             const name = declaration.name?.getText();
             if (name !== 'ExtensionMetadata') continue;
@@ -263,10 +344,10 @@ export class ManifestGenerator {
         const result: any = {};
         for (const prop of obj.properties) {
             if (!ts.isPropertyAssignment(prop)) continue;
-            
+
             const propName = prop.name.getText();
             const propValue = prop.initializer;
-            
+
             if (ts.isStringLiteral(propValue)) {
                 result[propName] = propValue.text;
             } else if (ts.isNumericLiteral(propValue)) {
@@ -281,26 +362,31 @@ export class ManifestGenerator {
     }
 
     private parseArrayLiteral(array: ts.ArrayLiteralExpression): any[] {
-        return array.elements.map(element => {
-            if (ts.isObjectLiteralExpression(element)) {
-                return this.parseObjectLiteral(element);
-            } else if (ts.isStringLiteral(element)) {
-                return element.text;
-            } else if (ts.isNumericLiteral(element)) {
-                return Number(element.text);
-            }
-            return null;
-        }).filter(Boolean);
+        return array.elements
+            .map((element) => {
+                if (ts.isObjectLiteralExpression(element)) {
+                    return this.parseObjectLiteral(element);
+                } else if (ts.isStringLiteral(element)) {
+                    return element.text;
+                } else if (ts.isNumericLiteral(element)) {
+                    return Number(element.text);
+                }
+                return null;
+            })
+            .filter(Boolean);
     }
 
     /**
      * Gets the relative path of a source file
-     * 
+     *
      * @param sourcePath Source file path
      * @param projectPath Optional project path
      * @returns Relative path of the source file
      */
     private getRelativePath(sourcePath: string, projectPath?: string): string {
-        return path.relative(projectPath || path.dirname(sourcePath), sourcePath);
+        return path.relative(
+            projectPath || path.dirname(sourcePath),
+            sourcePath
+        );
     }
 }
