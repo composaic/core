@@ -34,16 +34,27 @@ interface GenerateOptions {
 /**
  * Load and validate configuration file
  */
-function loadConfig(configPath: string): PluginManifestConfig {
+export function loadConfig(configPath: string): PluginManifestConfig {
     const resolvedPath = path.resolve(process.cwd(), configPath);
 
     if (!fs.existsSync(resolvedPath)) {
         throw new Error(`Configuration file not found: ${resolvedPath}`);
     }
 
-    const config = require(resolvedPath);
+    const content = fs.readFileSync(resolvedPath, 'utf8');
+    let config;
+    try {
+        config = JSON.parse(content);
+    } catch (error) {
+        throw new Error(
+            `Invalid JSON in configuration file: ${error instanceof Error ? error.message : String(error)}`
+        );
+    }
 
     // Basic validation
+    if (!config.plugins) {
+        throw new Error('Configuration must have a plugins property');
+    }
     if (!Array.isArray(config.plugins)) {
         throw new Error('Configuration must have a plugins array');
     }
@@ -54,7 +65,7 @@ function loadConfig(configPath: string): PluginManifestConfig {
 /**
  * Check if manifest generation is needed based on timestamps
  */
-function needsRegeneration(
+export function needsRegeneration(
     sourcePath: string,
     outputPath: string,
     force = false
@@ -72,7 +83,7 @@ function needsRegeneration(
 /**
  * Generate manifest for a single plugin
  */
-async function generateSingleManifest(
+export async function generateSingleManifest(
     sourcePath: string,
     outputPath: string,
     tsConfigPath: string,
@@ -97,13 +108,13 @@ async function generateSingleManifest(
     }
 
     fs.writeFileSync(outputPath, JSON.stringify(manifest, null, 4));
-    console.log(`Generated manifest for ${sourcePath}`);
+    console.log(`Generated manifest to ${outputPath}`);
 }
 
 /**
  * Generate manifests based on configuration
  */
-async function generateFromConfig(
+export async function generateFromConfig(
     config: PluginManifestConfig,
     force = false
 ): Promise<void> {
@@ -206,4 +217,11 @@ const watchCommand = new Command('watch')
         // Watch mode implementation will be added in next phase
     });
 
-program.addCommand(generateCommand).addCommand(watchCommand).parse();
+export function setupCli() {
+    return program.addCommand(generateCommand).addCommand(watchCommand);
+}
+
+// Only run when executed directly, not when imported for tests
+if (require.main === module) {
+    setupCli().parse();
+}

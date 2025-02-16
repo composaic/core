@@ -1,7 +1,7 @@
 {
     "name": "@composaic/core",
     "private": false,
-    "version": "0.13.3",
+    "version": "0.13.4",
     "description": "A Composable Micro-Frontend Framework",
     "main": "./dist/cjs/index.js",
     "module": "./dist/esm/index.mjs",
@@ -26,7 +26,9 @@
     "scripts": {
         "build:cjs": "tsc -p tsconfig.cjs.json",
         "build:esm": "tsc -p tsconfig.esm.json && npm run rename:esm",
-        "build": "npm run build:cjs && npm run build:esm && npm run compile-scss && npm run replace-scss-imports",
+        "build:manifests": "node ./scripts/generate-plugin-manifests.js",
+        "dev:manifests": "nodemon --watch src/plugins/impl -e ts --exec 'npm run build:manifests'",
+        "build": "npm run build:manifests && npm run build:cjs && npm run build:esm && npm run compile-scss && npm run replace-scss-imports",
         "build:replace-scss": "npm run replace-scss-imports",
         "clean": "rimraf dist",
         "rename:esm": "/bin/zsh ./scripts/fix-mjs.sh",
@@ -75,6 +77,7 @@
         "eslint-plugin-prettier": "^5.1.3",
         "globals": "^15.3.0",
         "jest": "^29.5.0",
+        "nodemon": "^3.0.3",
         "prettier": "^3.3.1",
         "rimraf": "^6.0.1",
         "sass": "^1.77.8",

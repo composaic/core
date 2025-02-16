@@ -17,6 +17,41 @@ import {
 } from './types';
 import { Metadata } from './decorators';
 
+// Define the standard order for manifest fields
+const MANIFEST_FIELD_ORDER = [
+    'plugin',
+    'version',
+    'description',
+    'module',
+    'package',
+    'class',
+    'extensionPoints',
+    'extensions',
+] as const;
+
+/**
+ * Orders an object's fields according to the standard manifest field order
+ */
+function orderManifestFields<T extends object>(manifest: T): T {
+    const orderedManifest: any = {};
+
+    // First add fields in our standard order
+    MANIFEST_FIELD_ORDER.forEach((field) => {
+        if (field in manifest) {
+            orderedManifest[field] = manifest[field as keyof T];
+        }
+    });
+
+    // Then add any remaining fields that weren't in our standard order
+    Object.keys(manifest).forEach((key) => {
+        if (!(key in orderedManifest)) {
+            orderedManifest[key] = manifest[key as keyof T];
+        }
+    });
+
+    return orderedManifest as T;
+}
+
 /**
  * Options for generating a single plugin manifest
  */
@@ -111,6 +146,10 @@ export class ManifestGenerator {
             sourceFile.forEachChild((node) => {
                 if (ts.isClassDeclaration(node) && node.name) {
                     console.log('- Class:', node.name.text);
+                    console.log(
+                        '  Can have decorators:',
+                        ts.canHaveDecorators(node)
+                    );
                     const decorators = ts.getDecorators(node);
                     if (decorators) {
                         console.log(
@@ -121,9 +160,24 @@ export class ManifestGenerator {
                                 )
                                 .join(', ')
                         );
+                        decorators.forEach((d) => {
+                            if (ts.isCallExpression(d.expression)) {
+                                console.log(
+                                    '  Expression type:',
+                                    d.expression.expression.getText()
+                                );
+                                console.log(
+                                    '  Arguments:',
+                                    d.expression.arguments.map((a) =>
+                                        a.getText()
+                                    )
+                                );
+                            }
+                        });
                     }
                 }
             });
+            console.log('Program options:', this.program.getCompilerOptions());
             throw new Error('No plugin class found');
         }
 
@@ -137,10 +191,10 @@ export class ManifestGenerator {
         }
 
         // Add class name from the plugin class itself
-        return {
+        return orderManifestFields({
             ...metadata,
             class: pluginClass.name?.text || '',
-        };
+        });
     }
 
     /**
@@ -190,15 +244,15 @@ export class ManifestGenerator {
                                   ...manifestWithoutExtensions,
                                   class: manifest.class,
                               },
-                    ],
+                    ].map((def) => orderManifestFields(def)),
                 };
             })
         );
 
-        return {
+        return orderManifestFields({
             name: options.name,
             plugins,
-        };
+        });
     }
 
     private findPluginClass(sourceFile: ts.SourceFile): {

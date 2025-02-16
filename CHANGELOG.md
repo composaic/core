@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.4 (16 Feb 2025)
+
+o Manifest based plugin metadata introduced
+
 ## 0.13.0 (26 Jan 2025)
 
 o Extracted web application plugins to @composaic/web
