@@ -32,6 +32,8 @@ export interface SystemPluginConfig extends BasePluginConfig {
     type: 'system';
     /** Output path for the manifest file */
     output: string;
+    /** Path to tsconfig.json file (optional) */
+    tsconfig?: string;
 }
 
 /**

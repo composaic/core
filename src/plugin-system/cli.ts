@@ -41,13 +41,18 @@ export function loadConfig(configPath: string): PluginManifestConfig {
         throw new Error(`Configuration file not found: ${resolvedPath}`);
     }
 
-    const content = fs.readFileSync(resolvedPath, 'utf8');
     let config;
     try {
-        config = JSON.parse(content);
+        // Use require for JavaScript/TypeScript files
+        config = require(resolvedPath);
+
+        // If the config is a module with a default export, use that
+        if (config && config.__esModule && config.default) {
+            config = config.default;
+        }
     } catch (error) {
         throw new Error(
-            `Invalid JSON in configuration file: ${error instanceof Error ? error.message : String(error)}`
+            `Failed to load configuration file: ${error instanceof Error ? error.message : String(error)}`
         );
     }
 
@@ -124,7 +129,7 @@ export async function generateFromConfig(
             await generateSingleManifest(
                 systemPlugin.source,
                 systemPlugin.output,
-                'tsconfig.json',
+                systemPlugin.tsconfig || 'tsconfig.json',
                 force
             );
         } else {

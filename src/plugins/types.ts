@@ -145,7 +145,7 @@ export abstract class Plugin {
         // }
         this.extensionsPoints[extensionPointId] = extensions;
     }
-    protected getConnectedExtensions(
+    getConnectedExtensions(
         extensionPointId: string
     ): { plugin: string; extensionImpl?: object; meta?: object }[] {
         return this.extensionsPoints[extensionPointId];

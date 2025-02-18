@@ -264,11 +264,31 @@ export class ManifestGenerator {
             metadata: PluginMetadataType;
         }[] = [];
 
+        console.log('Starting class search...');
+
         const visit = (node: ts.Node) => {
-            if (ts.isClassDeclaration(node) && node.name) {
-                const metadata = this.getPluginMetadata(node);
-                if (metadata) {
-                    pluginClasses.push({ pluginClass: node, metadata });
+            if (ts.isClassDeclaration(node)) {
+                console.log('Found class:', node.name?.getText());
+                const decorators = ts.getDecorators(node);
+                if (decorators && decorators.length > 0) {
+                    console.log(
+                        'Class has decorators:',
+                        decorators
+                            .map((d: ts.Decorator) => {
+                                const text = d.expression.getText();
+                                console.log('Decorator expression:', text);
+                                return text;
+                            })
+                            .join(', ')
+                    );
+
+                    const metadata = this.getPluginMetadata(node);
+                    console.log('Metadata found:', metadata ? 'yes' : 'no');
+                    if (metadata) {
+                        pluginClasses.push({ pluginClass: node, metadata });
+                    }
+                } else {
+                    console.log('Class has no decorators');
                 }
             }
             ts.forEachChild(node, visit);
@@ -332,22 +352,10 @@ export class ManifestGenerator {
         for (const decorator of decorators) {
             if (!ts.isCallExpression(decorator.expression)) continue;
 
-            const signature = this.typeChecker.getResolvedSignature(
-                decorator.expression
-            );
-            if (!signature) continue;
+            const decoratorName = decorator.expression.expression.getText();
+            if (decoratorName !== 'PluginMetadata') continue;
 
-            const declaration = signature.declaration;
-            if (
-                !declaration ||
-                (!ts.isMethodDeclaration(declaration) &&
-                    !ts.isFunctionDeclaration(declaration))
-            )
-                continue;
-
-            const name = declaration.name?.getText();
-            if (name !== 'PluginMetadata') continue;
-
+            if (decorator.expression.arguments.length !== 1) continue;
             const arg = decorator.expression.arguments[0];
             if (!ts.isObjectLiteralExpression(arg)) continue;
 
@@ -369,22 +377,10 @@ export class ManifestGenerator {
         for (const decorator of decorators) {
             if (!ts.isCallExpression(decorator.expression)) continue;
 
-            const signature = this.typeChecker.getResolvedSignature(
-                decorator.expression
-            );
-            if (!signature) continue;
+            const decoratorName = decorator.expression.expression.getText();
+            if (decoratorName !== 'ExtensionMetadata') continue;
 
-            const declaration = signature.declaration;
-            if (
-                !declaration ||
-                (!ts.isMethodDeclaration(declaration) &&
-                    !ts.isFunctionDeclaration(declaration))
-            )
-                continue;
-
-            const name = declaration.name?.getText();
-            if (name !== 'ExtensionMetadata') continue;
-
+            if (decorator.expression.arguments.length !== 1) continue;
             const arg = decorator.expression.arguments[0];
             if (!ts.isObjectLiteralExpression(arg)) continue;
 
