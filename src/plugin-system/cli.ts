@@ -43,12 +43,16 @@ export function loadConfig(configPath: string): PluginManifestConfig {
 
     let config;
     try {
-        // Use require for JavaScript/TypeScript files
-        config = require(resolvedPath);
-
-        // If the config is a module with a default export, use that
-        if (config && config.__esModule && config.default) {
-            config = config.default;
+        const fileContent = fs.readFileSync(resolvedPath, 'utf8');
+        try {
+            config = JSON.parse(fileContent);
+        } catch {
+            // If JSON parse fails, try requiring (for JS/TS files)
+            config = require(resolvedPath);
+            // If the config is a module with a default export, use that
+            if (config && config.__esModule && config.default) {
+                config = config.default;
+            }
         }
     } catch (error) {
         throw new Error(
@@ -57,8 +61,8 @@ export function loadConfig(configPath: string): PluginManifestConfig {
     }
 
     // Basic validation
-    if (!config.plugins) {
-        throw new Error('Configuration must have a plugins property');
+    if (!config || typeof config !== 'object') {
+        throw new Error('Configuration must be an object');
     }
     if (!Array.isArray(config.plugins)) {
         throw new Error('Configuration must have a plugins array');
