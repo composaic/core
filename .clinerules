@@ -6,6 +6,7 @@
 [development]
 typescript.strict = true
 typescript.targetVersion = "ES2020"
+typescript.decorators = "standard"  # Use TypeScript 5+ standard decorators, no experimental flags
 formatting.indentSize = 2
 formatting.quotes = "single"
 formatting.trailingComma = "es5"
@@ -44,4 +45,3 @@ optimization.minify = true
 # Note: Yes, I will automatically detect and process this file if named .clinerules
 # Both structured rules and natural language requirements will be incorporated into
 # my decision-making process when assisting with your project.
-

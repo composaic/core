@@ -19,12 +19,13 @@ import { Metadata } from './decorators';
 
 // Define the standard order for manifest fields
 const MANIFEST_FIELD_ORDER = [
+    'package',
+    'module',
+    'class',
     'plugin',
+    'load',
     'version',
     'description',
-    'module',
-    'package',
-    'class',
     'extensionPoints',
     'extensions',
 ] as const;
@@ -203,55 +204,64 @@ export class ManifestGenerator {
     async generateCollection(
         options: GenerateCollectionOptions
     ): Promise<CollectionManifest> {
-        const plugins = await Promise.all(
+        // Group plugins by their remote config
+        const remoteGroups = new Map<
+            string,
+            {
+                remote: RemoteConfig;
+                definitions: PluginManifest[];
+            }
+        >();
+
+        // Process each plugin
+        await Promise.all(
             options.pluginSources.map(async (source) => {
-                // Create a new generator for each plugin
                 const generator = new ManifestGenerator({
                     tsConfigPath: this.options.tsConfigPath,
                     pluginPath: source.sourcePath,
                 });
 
                 const manifest = await generator.generateManifest();
+                if (!manifest) return;
 
-                if (!manifest) {
-                    return {
-                        remote: source.remote,
-                        definitions: [],
-                    };
-                }
-
-                // Only remove extensionPoints from collection manifest
+                // Remove extensionPoints and prepare the definition
                 const {
                     extensionPoints: _,
                     ...manifestWithoutExtensionPoints
                 } = manifest;
 
-                // For the logger plugin, don't include extensions
-                const shouldIncludeExtensions =
-                    manifest.plugin === '@composaic/navbar';
-                const { extensions: __, ...manifestWithoutExtensions } =
-                    manifestWithoutExtensionPoints;
+                // Create a key for the remote config
+                const remoteKey = JSON.stringify(source.remote);
 
-                return {
-                    remote: source.remote,
-                    definitions: [
-                        shouldIncludeExtensions
-                            ? {
-                                  ...manifestWithoutExtensionPoints,
-                                  class: manifest.class,
-                              }
-                            : {
-                                  ...manifestWithoutExtensions,
-                                  class: manifest.class,
-                              },
-                    ].map((def) => orderManifestFields(def)),
-                };
+                // Get or create the group for this remote config
+                let group = remoteGroups.get(remoteKey);
+                if (!group) {
+                    group = {
+                        remote: source.remote,
+                        definitions: [],
+                    };
+                    remoteGroups.set(remoteKey, group);
+                }
+
+                // Add this plugin's definition to the group
+                group.definitions.push(
+                    orderManifestFields({
+                        ...manifest,
+                        class: manifest.class,
+                    })
+                );
             })
         );
 
+        // Convert the grouped plugins to the final format
         return orderManifestFields({
             name: options.name,
-            plugins,
+            plugins: Array.from(remoteGroups.values()).map((group) => ({
+                remote: group.remote,
+                definitions: group.definitions.map((def) =>
+                    orderManifestFields(def)
+                ),
+            })),
         });
     }
 

@@ -1,6 +1,6 @@
 /**
  * Core Plugin System Types
- * 
+ *
  * This module defines the core type definitions for the Composaic plugin system.
  * It includes interfaces for plugin metadata, extension points, and manifest structures.
  */
@@ -36,16 +36,18 @@ export interface ExtensionMetadata {
  * Defines the metadata for a plugin, including its name, version, and dependencies.
  */
 export interface PluginMetadataType {
+    /** Package name */
+    package: string;
+    /** Module name */
+    module: string;
     /** Plugin identifier */
     plugin: string;
     /** Version of the plugin */
     version: string;
     /** Description of the plugin */
     description?: string;
-    /** Module name */
-    module: string;
-    /** Package name */
-    package: string;
+    /** Loading strategy (e.g. "deferred") */
+    load?: string;
     /** Extension points provided by this plugin */
     extensionPoints?: ExtensionPointMetadata[];
     /** Extensions provided by this plugin */
@@ -79,7 +81,7 @@ export interface CollectionManifest {
         /** Remote configuration for plugin loading */
         remote?: RemoteConfig;
         /** List of plugin definitions */
-        definitions: PluginMetadataType[];
+        definitions: PluginManifest[];
     }[];
 }
 
