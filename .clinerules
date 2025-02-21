@@ -21,6 +21,15 @@ target.node = ">=14"
 target.browser = ["chrome >= 80", "firefox >= 75"]
 optimization.minify = true
 
+# Workspace Structure
+# Format: Directory structure and important paths
+
+[workspace]
+root = "composaic"
+directories = ["core", "web", "demo"]
+plugins.path = "demo/applications"
+plugins.examples = ["plugin-template", "test-plugin-one"]
+
 # Natural Language Requirements
 # Format: [requirement-id] description
 
