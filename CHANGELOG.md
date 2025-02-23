@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.5 (23 Feb 2025)
+
+o Extension meta data handling improvements
+
 ## 0.13.4 (16 Feb 2025)
 
 o Manifest based plugin metadata introduced
