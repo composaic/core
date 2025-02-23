@@ -138,6 +138,33 @@ export async function generateFromConfig(
             );
         } else {
             const appPlugin = plugin as ApplicationPluginConfig;
+            const manifestPath = appPlugin.collective.output;
+
+            // Check timestamps before any processing
+            if (!force && fs.existsSync(manifestPath)) {
+                const manifestTime = fs.statSync(manifestPath).mtimeMs;
+                let needsUpdate = false;
+
+                for (const plugin of appPlugin.collective.plugins) {
+                    try {
+                        if (fs.statSync(plugin.source).mtimeMs > manifestTime) {
+                            needsUpdate = true;
+                            break;
+                        }
+                    } catch {
+                        // Skip missing files
+                        continue;
+                    }
+                }
+
+                if (!needsUpdate) {
+                    console.log(
+                        `Skipping ${manifestPath} - no plugin files modified`
+                    );
+                    continue;
+                }
+            }
+
             const generator = new ManifestGenerator({
                 tsConfigPath: 'tsconfig.json',
                 pluginPath: appPlugin.collective.plugins[0].source,
@@ -151,13 +178,8 @@ export async function generateFromConfig(
                 })),
             });
 
-            fs.writeFileSync(
-                appPlugin.collective.output,
-                JSON.stringify(manifest, null, 4)
-            );
-            console.log(
-                `Generated collective manifest: ${appPlugin.collective.output}`
-            );
+            fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 4));
+            console.log(`Generated collective manifest: ${manifestPath}`);
         }
     }
 }
