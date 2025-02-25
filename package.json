@@ -1,7 +1,7 @@
 {
     "name": "@composaic/core",
     "private": false,
-    "version": "0.13.6",
+    "version": "0.13.7",
     "description": "A Composable Micro-Frontend Framework",
     "main": "./dist/cjs/index.js",
     "module": "./dist/esm/index.mjs",
@@ -60,7 +60,6 @@
         "@eslint/js": "^9.4.0",
         "@rollup/plugin-alias": "^5.1.0",
         "@types/jest": "^29.5.12",
-        "commander": "^13.1.0",
         "concurrently": "^8.2.2",
         "eslint": "^9.10.0",
         "eslint-config-prettier": "^9.1.0",
@@ -78,6 +77,8 @@
         "typescript-eslint": "^8.8.0"
     },
     "dependencies": {
+        "chokidar": "^3.6.0",
+        "commander": "^13.1.0",
         "express": "^4.19.2",
         "mitt": "^3.0.1",
         "reflect-metadata": "^0.2.2",

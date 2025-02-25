@@ -209,7 +209,7 @@ describe('CLI', () => {
     describe('generateFromConfig', () => {
         it('should generate manifests based on configuration', async () => {
             const config = loadConfig(configFile);
-            await generateFromConfig(config, true);
+            await generateFromConfig(config, configFile, true);
 
             // Verify manifest was generated
             const plugin = config.plugins[0] as SystemPluginConfig;
@@ -228,12 +228,12 @@ describe('CLI', () => {
             const config = loadConfig(configFile);
 
             // Generate first time
-            await generateFromConfig(config, true);
+            await generateFromConfig(config, configFile, true);
             const plugin = config.plugins[0] as SystemPluginConfig;
             const firstStat = fs.statSync(plugin.output);
 
             // Try to generate again without force
-            await generateFromConfig(config, false);
+            await generateFromConfig(config, configFile, false);
             const secondStat = fs.statSync(plugin.output);
 
             expect(secondStat.mtimeMs).toBe(firstStat.mtimeMs);

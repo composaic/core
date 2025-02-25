@@ -125,20 +125,25 @@ export async function generateSingleManifest(
  */
 export async function generateFromConfig(
     config: PluginManifestConfig,
+    configPath: string,
     force = false
 ): Promise<void> {
+    const configDir = path.dirname(path.resolve(process.cwd(), configPath));
     for (const plugin of config.plugins) {
         if (plugin.type === 'system') {
             const systemPlugin = plugin as SystemPluginConfig;
             await generateSingleManifest(
-                systemPlugin.source,
-                systemPlugin.output,
-                systemPlugin.tsconfig || 'tsconfig.json',
+                path.join(configDir, systemPlugin.source),
+                path.join(configDir, systemPlugin.output),
+                path.join(configDir, systemPlugin.tsconfig || 'tsconfig.json'),
                 force
             );
         } else {
             const appPlugin = plugin as ApplicationPluginConfig;
-            const manifestPath = appPlugin.collective.output;
+            const manifestPath = path.join(
+                configDir,
+                appPlugin.collective.output
+            );
 
             // Check timestamps before any processing
             if (!force && fs.existsSync(manifestPath)) {
@@ -147,7 +152,8 @@ export async function generateFromConfig(
 
                 for (const plugin of appPlugin.collective.plugins) {
                     try {
-                        if (fs.statSync(plugin.source).mtimeMs > manifestTime) {
+                        const sourcePath = path.join(configDir, plugin.source);
+                        if (fs.statSync(sourcePath).mtimeMs > manifestTime) {
                             needsUpdate = true;
                             break;
                         }
@@ -166,14 +172,17 @@ export async function generateFromConfig(
             }
 
             const generator = new ManifestGenerator({
-                tsConfigPath: 'tsconfig.json',
-                pluginPath: appPlugin.collective.plugins[0].source,
+                tsConfigPath: path.join(configDir, 'tsconfig.json'),
+                pluginPath: path.join(
+                    configDir,
+                    appPlugin.collective.plugins[0].source
+                ),
             });
 
             const manifest = await generator.generateCollection({
                 name: appPlugin.collective.name,
                 pluginSources: appPlugin.collective.plugins.map((p) => ({
-                    sourcePath: p.source,
+                    sourcePath: path.join(configDir, p.source),
                     remote: p.remote,
                 })),
             });
@@ -203,7 +212,7 @@ const generateCommand = new Command('generate')
         try {
             if (options.config) {
                 const config = loadConfig(options.config);
-                await generateFromConfig(config, options.force);
+                await generateFromConfig(config, options.config, options.force);
             } else if (options.plugin) {
                 if (!options.output) {
                     throw new Error(
@@ -241,11 +250,61 @@ const watchCommand = new Command('watch')
         }
 
         const config = loadConfig(options.config);
-        const patterns = config.optimization?.watchMode?.patterns || [];
+        const configDir = path.dirname(
+            path.resolve(process.cwd(), options.config)
+        );
+        const patterns = (config.optimization?.watchMode?.patterns || []).map(
+            (pattern) => path.join(configDir, pattern)
+        );
         const debounceMs = config.optimization?.watchMode?.debounceMs || 100;
 
-        console.log(`Watching for changes... (${patterns.join(', ')})`);
-        // Watch mode implementation will be added in next phase
+        console.log(`Watching for changes in ${configDir}...`);
+        console.log(`Patterns: ${patterns.join(', ')}`);
+
+        const chokidar = require('chokidar');
+        const watcher = chokidar.watch(patterns, {
+            persistent: true,
+            ignoreInitial: true,
+        });
+
+        let timeoutId: NodeJS.Timeout | null = null;
+        const debouncedGenerate = () => {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
+            timeoutId = setTimeout(async () => {
+                try {
+                    await generateFromConfig(config, options.config, false);
+                    console.log('Manifests updated successfully');
+                } catch (error) {
+                    console.error(
+                        'Error updating manifests:',
+                        error instanceof Error ? error.message : String(error)
+                    );
+                }
+                timeoutId = null;
+            }, debounceMs);
+        };
+
+        watcher.on('change', (path: string) => {
+            console.log(`File ${path} has been changed`);
+            debouncedGenerate();
+        });
+
+        watcher.on('add', (path: string) => {
+            console.log(`File ${path} has been added`);
+            debouncedGenerate();
+        });
+
+        watcher.on('unlink', (path: string) => {
+            console.log(`File ${path} has been removed`);
+            debouncedGenerate();
+        });
+
+        process.on('SIGINT', () => {
+            watcher.close();
+            process.exit(0);
+        });
     });
 
 export function setupCli() {
