@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.6 (25 Feb 2025)
+
+o Fix manifest build to check timestamps
+
 ## 0.13.5 (23 Feb 2025)
 
 o Extension meta data handling improvements
