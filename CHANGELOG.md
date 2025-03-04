@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.14.0 (4 Mar 2025)
+
+o Fixed path handling and some other failing tests
+o 0.14.0 is the official release for annotations based plugins
+
 ## 0.13.6 (25 Feb 2025)
 
 o Fix manifest dev build (watch mode)
