@@ -132,18 +132,32 @@ export async function generateFromConfig(
     for (const plugin of config.plugins) {
         if (plugin.type === 'system') {
             const systemPlugin = plugin as SystemPluginConfig;
+            const sourcePath = path.isAbsolute(systemPlugin.source)
+                ? systemPlugin.source
+                : path.resolve(configDir, systemPlugin.source);
+            const outputPath = path.isAbsolute(systemPlugin.output)
+                ? systemPlugin.output
+                : path.resolve(configDir, systemPlugin.output);
+            const tsconfigPath = path.isAbsolute(
+                systemPlugin.tsconfig || 'tsconfig.json'
+            )
+                ? systemPlugin.tsconfig || 'tsconfig.json'
+                : path.resolve(
+                      configDir,
+                      systemPlugin.tsconfig || 'tsconfig.json'
+                  );
+
             await generateSingleManifest(
-                path.join(configDir, systemPlugin.source),
-                path.join(configDir, systemPlugin.output),
-                path.join(configDir, systemPlugin.tsconfig || 'tsconfig.json'),
+                sourcePath,
+                outputPath,
+                tsconfigPath,
                 force
             );
         } else {
             const appPlugin = plugin as ApplicationPluginConfig;
-            const manifestPath = path.join(
-                configDir,
-                appPlugin.collective.output
-            );
+            const manifestPath = path.isAbsolute(appPlugin.collective.output)
+                ? appPlugin.collective.output
+                : path.resolve(configDir, appPlugin.collective.output);
 
             // Check timestamps before any processing
             if (!force && fs.existsSync(manifestPath)) {
@@ -152,7 +166,9 @@ export async function generateFromConfig(
 
                 for (const plugin of appPlugin.collective.plugins) {
                     try {
-                        const sourcePath = path.join(configDir, plugin.source);
+                        const sourcePath = path.isAbsolute(plugin.source)
+                            ? plugin.source
+                            : path.resolve(configDir, plugin.source);
                         if (fs.statSync(sourcePath).mtimeMs > manifestTime) {
                             needsUpdate = true;
                             break;
@@ -172,17 +188,23 @@ export async function generateFromConfig(
             }
 
             const generator = new ManifestGenerator({
-                tsConfigPath: path.join(configDir, 'tsconfig.json'),
-                pluginPath: path.join(
-                    configDir,
+                tsConfigPath: path.resolve(configDir, 'tsconfig.json'),
+                pluginPath: path.isAbsolute(
                     appPlugin.collective.plugins[0].source
-                ),
+                )
+                    ? appPlugin.collective.plugins[0].source
+                    : path.resolve(
+                          configDir,
+                          appPlugin.collective.plugins[0].source
+                      ),
             });
 
             const manifest = await generator.generateCollection({
                 name: appPlugin.collective.name,
                 pluginSources: appPlugin.collective.plugins.map((p) => ({
-                    sourcePath: path.join(configDir, p.source),
+                    sourcePath: path.isAbsolute(p.source)
+                        ? p.source
+                        : path.resolve(configDir, p.source),
                     remote: p.remote,
                 })),
             });

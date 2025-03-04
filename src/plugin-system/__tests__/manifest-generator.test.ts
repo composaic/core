@@ -32,12 +32,12 @@ describe('ManifestGenerator', () => {
 
             // Test field order matches MANIFEST_FIELD_ORDER
             const expectedOrder = [
+                'package',
+                'module',
+                'class',
                 'plugin',
                 'version',
                 'description',
-                'module',
-                'package',
-                'class',
                 'extensionPoints',
                 'extensions',
             ];
@@ -119,12 +119,12 @@ describe('ManifestGenerator', () => {
             // Verify field order matches MANIFEST_FIELD_ORDER
             const manifestFields = Object.keys(manifest);
             const MANIFEST_FIELD_ORDER = [
+                'package',
+                'module',
+                'class',
                 'plugin',
                 'version',
                 'description',
-                'module',
-                'package',
-                'class',
                 'extensionPoints',
                 'extensions',
             ];
@@ -319,6 +319,12 @@ describe('ManifestGenerator', () => {
                                 module: 'index',
                                 package: 'navbar',
                                 class: 'NavbarPlugin',
+                                extensionPoints: [
+                                    {
+                                        id: 'navbar',
+                                        type: 'NavbarExtensionPoint',
+                                    },
+                                ],
                                 extensions: [
                                     {
                                         plugin: 'self',
@@ -342,6 +348,19 @@ describe('ManifestGenerator', () => {
                                 module: 'index',
                                 package: 'logger',
                                 class: 'LoggerPlugin',
+                                extensionPoints: [
+                                    {
+                                        id: 'logger',
+                                        type: 'LoggerExtensionPoint',
+                                    },
+                                ],
+                                extensions: [
+                                    {
+                                        plugin: 'self',
+                                        id: 'logger',
+                                        className: 'SimpleLoggerExtension',
+                                    },
+                                ],
                             },
                         ],
                     },
@@ -372,12 +391,13 @@ describe('ManifestGenerator', () => {
             // Test that each plugin definition maintains the correct field order
             const pluginDefinition = collection.plugins[0].definitions[0];
             const expectedOrder = [
+                'package',
+                'module',
+                'class',
                 'plugin',
                 'version',
                 'description',
-                'module',
-                'package',
-                'class',
+                'extensionPoints',
                 'extensions',
             ];
 
