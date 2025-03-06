@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.14.0 (4 Mar 2025)
+
+o Fixed path handling and some other failing tests
+o 0.14.0 is the official release for annotations based plugins
+
+## 0.13.6 (25 Feb 2025)
+
+o Fix manifest dev build (watch mode)
+
+## 0.13.6 (25 Feb 2025)
+
+o Fix manifest build to check timestamps
+
+## 0.13.5 (23 Feb 2025)
+
+o Extension meta data handling improvements
+
+## 0.13.4 (16 Feb 2025)
+
+o Manifest based plugin metadata introduced
+
 ## 0.13.0 (26 Jan 2025)
 
 o Extracted web application plugins to @composaic/web

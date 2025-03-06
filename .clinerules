@@ -1,0 +1,56 @@
+# Cline Project Rules Configuration
+
+# Structured Rules
+# Format: property = value
+
+[development]
+typescript.strict = true
+typescript.targetVersion = "ES2020"
+typescript.decorators = "standard"  # Use TypeScript 5+ standard decorators, no experimental flags
+formatting.indentSize = 2
+formatting.quotes = "single"
+formatting.trailingComma = "es5"
+
+[testing]
+coverage.min = 80
+unitTests = required
+e2eTests = optional
+
+[build]
+target.node = ">=14"
+target.browser = ["chrome >= 80", "firefox >= 75"]
+optimization.minify = true
+
+# Workspace Structure
+# Format: Directory structure and important paths
+
+[workspace]
+root = "composaic"
+directories = ["core", "web", "demo"]
+plugins.path = "demo/applications"
+plugins.examples = ["plugin-template", "test-plugin-one"]
+
+# Natural Language Requirements
+# Format: [requirement-id] description
+
+[REQ-001] All new features must include corresponding unit tests
+[REQ-002] Documentation must be updated when APIs change
+[REQ-003] Performance impact must be considered for all changes
+[REQ-004] External dependencies must be reviewed for security vulnerabilities
+[REQ-005] Code reviews require at least two approvals before merging
+[REQ-006] Breaking changes must be documented in CHANGELOG.md
+[REQ-007] Branch names should follow pattern: type/description (e.g., feature/add-auth)
+[REQ-008] Commit messages must be descriptive and follow conventional commits
+
+# Custom Freeform Requirements
+# Add any project-specific requirements below in natural language
+
+1. The application must maintain responsive performance even with large datasets
+2. Error messages should be user-friendly and actionable
+3. All user-facing strings must support internationalization
+4. Backend services must implement proper rate limiting
+5. API endpoints must be versioned appropriately
+
+# Note: Yes, I will automatically detect and process this file if named .clinerules
+# Both structured rules and natural language requirements will be incorporated into
+# my decision-making process when assisting with your project.

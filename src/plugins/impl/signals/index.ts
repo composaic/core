@@ -1,4 +1,5 @@
 import { Plugin } from '../../types.js';
+import { PluginMetadata } from '../../../plugin-system/decorators.js';
 
 export type SignalDefinition = {
     signal: string;
@@ -11,6 +12,19 @@ export type SignalDefinition = {
  */
 export interface SignalsExtensionPoint {}
 
+@PluginMetadata({
+    plugin: '@composaic/signals',
+    version: '0.1.0',
+    description: 'Signals Plugin',
+    module: 'index',
+    package: 'signals',
+    extensionPoints: [
+        {
+            id: 'signals',
+            type: 'SignalsExtensionPoint',
+        },
+    ],
+})
 export class SignalsPlugin extends Plugin {
     signals: { [key: string]: SignalDefinition } = {};
     async start() {
