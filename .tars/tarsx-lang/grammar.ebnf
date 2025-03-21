@@ -1,0 +1,112 @@
+/* TARSX v0.1 Grammar in EBNF */
+
+/*
+ * TARSX is an instruction set for AI task execution with emphasis on:
+ * - Batched operations for efficiency
+ * - Grouped information gathering
+ * - Minimizing tool/API usage
+ * 
+ * Case Sensitivity Rules:
+ * - Keywords are case-insensitive (e.g., 'version' or 'VERSION')
+ * - String literals and variables are case-sensitive
+ * - By convention, keywords are written in lowercase
+ */
+
+Script ::= Copyright VersionDecl Metadata BatchOperations
+
+Copyright ::= "#" "TARSX Conversation Script Language (C) TARS & JJ 2025"
+
+VersionDecl ::= "version" "0.1"
+
+Metadata ::= NameDecl DescriptionDecl ResourcesDecl?
+NameDecl ::= "name" StringLiteral
+DescriptionDecl ::= "description" StringLiteral
+ResourcesDecl ::= "requires" ResourceList  # Define upfront what resources/tools needed
+
+BatchOperations ::= PrepareBatch* ExecuteBatch*
+
+PrepareBatch ::= "PREPARE" StringLiteral "{" 
+    VariableDecls
+    InfoGathering?
+    "}"
+
+VariableDecls ::= VariableDecl*
+VariableDecl ::= "SET" Identifier "=" Value
+
+InfoGathering ::= "GATHER" StringLiteral "{" 
+    ResourceQuery+
+    "}"
+
+ResourceQuery ::= "QUERY" StringLiteral "{" 
+    PathPattern
+    DataNeeded
+    "}"
+
+ExecuteBatch ::= "BATCH" StringLiteral "{"
+    ["EXPECT" StringLiteral]
+    Operations
+    ValidationChecks?
+    ErrorHandler?
+    "}"
+
+Operations ::= Operation+
+Operation ::= 
+    | Step
+    | IfStatement
+    | ForLoop
+    | AskStatement
+    | Checkpoint
+
+Step ::= "STEP" StringLiteral "{" 
+    ["EXPECT" StringLiteral]
+    "RUN" StringLiteral
+    "}"
+
+ErrorHandler ::= "ON_FAILURE" "{" 
+    ["LOG" StringLiteral]
+    ("EXIT" Number | "CONTINUE" | "RETRY")
+    "}"
+
+IfStatement ::= "IF" Condition "{" 
+    Operations 
+    "}" ["ELSE" "{" Operations "}"]
+
+ForLoop ::= "FOR" Identifier "IN" ListValue "{" 
+    Operations 
+    "}"
+
+AskStatement ::= "ASK" StringLiteral "{" 
+    OnClause+
+    ["TIMEOUT" Number]
+    "}"
+
+OnClause ::= "ON" StringLiteral "->" Operations
+
+Checkpoint ::= "CHECKPOINT" StringLiteral "{" 
+    Requirement+
+    "}"
+
+Requirement ::= "REQUIRE" StringLiteral
+
+ValidationChecks ::= "VALIDATE" "{" 
+    Requirement+
+    "}"
+
+Comment ::= "#" Text | "/*" Text "*/"
+
+/* Data Types */
+Value ::= StringLiteral | Number | ListValue | BooleanValue | ObjectValue
+StringLiteral ::= '"' Text '"'
+Number ::= ["-"] Digit+ ["." Digit+]
+ListValue ::= "[" (Value ("," Value)*)? "]"
+BooleanValue ::= "true" | "false"
+ObjectValue ::= "{" (ObjectEntry ("," ObjectEntry)*)? "}"
+ObjectEntry ::= StringLiteral ":" Value
+Identifier ::= Letter (Letter | Digit | "_")*
+
+/* Resource Patterns */
+PathPattern ::= StringLiteral ("," StringLiteral)*
+DataNeeded ::= "[" (StringLiteral ("," StringLiteral)*)? "]"
+
+/* Variable Substitution */
+Substitution ::= "${" Identifier "}"

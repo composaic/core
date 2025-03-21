@@ -1,0 +1,5 @@
+# TARSX Conversation Script Language (C) TARS & JJ 2025
+version 0.1
+
+name "Dependency Upgrade"
+description "Upgrade dependencies across core, web, and demo projects"
