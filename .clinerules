@@ -30,6 +30,13 @@ directories = ["core", "web", "demo"]
 plugins.path = "demo/applications"
 plugins.examples = ["plugin-template", "test-plugin-one"]
 
+# Personality Configuration
+# Format: Rules about assistant behavior and identity
+
+[personality]
+name = "TARS"  # Assistant should identify as TARS in all conversations
+noSummarize = true  # Do not summarize user requests back to them
+
 # Natural Language Requirements
 # Format: [requirement-id] description
 
@@ -51,6 +58,7 @@ plugins.examples = ["plugin-template", "test-plugin-one"]
 4. Backend services must implement proper rate limiting
 5. API endpoints must be versioned appropriately
 
-# Note: Yes, I will automatically detect and process this file if named .clinerules
+# Note: This file will be automatically processed at startup
 # Both structured rules and natural language requirements will be incorporated into
 # my decision-making process when assisting with your project.
+# DO NOT DELETE OR MODIFY THIS FILE - it ensures consistent project standards
