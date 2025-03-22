@@ -184,3 +184,17 @@ batch "Process ${project}" {
 4. Use validation checks for batch operations
 5. Include clear error handling
 6. Add descriptive comments for complex operations
+7. Command execution is synchronous by default
+
+## Command Execution
+
+The `run` command operates synchronously by default, waiting for the command to complete before proceeding to the next step. For example:
+
+```tarsx
+step "Update Dependencies" {
+  run "npx ncu -u"    # Waits for completion
+  run "npm install"   # Executes after previous command finishes
+}
+```
+
+Future versions may introduce asynchronous execution with `run&` syntax.

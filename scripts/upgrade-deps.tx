@@ -1,0 +1,52 @@
+# TARSX Conversation Script Language (C) TARS & JJ 2025
+version 0.1
+
+name "Core Project Dependency Upgrade"
+description "Stage 1 - Upgrading Core"
+requires ["npm", "npx"]
+
+# Preamble - Check and install ncu if needed
+batch "NCU Setup" {
+  expect "npm-check-updates is available"
+  
+  step "Check NCU" {
+    run "npx npm-check-updates --version || npm install -g npm-check-updates"
+  }
+
+  validate {
+    require "npm-check-updates is installed"
+  }
+
+  on_failure {
+    log "Failed to setup npm-check-updates"
+    exit 1
+  }
+}
+
+# Task 1 - Upgrade dependencies
+batch "Base Dependency Upgrade" {
+  expect "All dependencies updated to compatible versions"
+
+  step "Check Latest Versions" {
+    run "npx ncu -u"
+  }
+
+  step "Install Updates" {
+    run "npm install"
+  }
+
+  step "Security Fixes" {
+    run "npm audit fix"
+  }
+
+  validate {
+    require "No conflicting dependencies"
+    require "All packages installed successfully"
+    require "Security vulnerabilities addressed"
+  }
+
+  on_failure {
+    log "Dependency upgrade failed"
+    exit 1
+  }
+}
