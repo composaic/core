@@ -12,18 +12,24 @@ projects {
     demo "/Users/johnny/dev/composaic/demo"
 }
 
-# Context Definitions
 init {
-    context "core" { path "${projects.core}" }
-    context "web" { path "${projects.web}" }
-    context "demo" { path "${projects.demo}" }
+    # Create initial terminals
+    terminal "core" {
+        path "${projects.core}"
+    }
+    terminal "web" {
+        path "${projects.web}"
+    }
+    terminal "demo" {
+        path "${projects.demo}"
+    }
 }
 
 # Preamble - Check and install ncu if needed
 batch "NCU Setup" {
     expect "npm-check-updates is available"
     
-    use-context "core"
+    use-terminal "core"
     step "Check NCU" {
         run "npx npm-check-updates --version || npm install -g npm-check-updates"
     }
@@ -42,7 +48,7 @@ batch "NCU Setup" {
 batch "Base Dependency Upgrade" {
     expect "All dependencies updated to compatible versions"
 
-    use-context "core"
+    use-terminal "core"
     step "Check Latest Versions" {
         run "npx ncu -u"
     }
@@ -72,7 +78,7 @@ batch "Web Integration Test" {
     expect "Core project successfully integrates with web project"
 
     # Core project tasks
-    use-context "core"
+    use-terminal "core"
     step "Install Core Dependencies" {
         run "npm install"
     }
@@ -81,7 +87,7 @@ batch "Web Integration Test" {
     }
 
     # Web project tasks
-    use-context "web"
+    use-terminal "web"
     step "Install Web Dependencies" {
         run "npm install"
     }
@@ -93,10 +99,6 @@ batch "Web Integration Test" {
     }
     step "Build Web Project" {
         run "npm run build"
-    }
-    
-    step "Link Web Project" {
-        run "npm link"
     }
 
     validate {
@@ -110,7 +112,7 @@ batch "Web Integration Test" {
 
     on_failure {
         log "Web integration test failed"
-        use-context "web"
+        use-terminal "web"
         rollback "npm unlink @composaic/core" # Remove the core link if integration fails
         exit 1
     }

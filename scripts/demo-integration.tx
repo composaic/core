@@ -1,0 +1,125 @@
+# TARSX Conversation Script Language (C) TARS & JJ 2025
+version 0.1
+
+name "Demo Project Integration"
+description "Stage 2 - Setting up demo apps with core and web dependencies"
+requires ["npm", "npx", "concurrently"]
+
+# Version Requirements
+# - React and ReactDOM must stay on v18.x.x across all projects
+# - @types/react and @types/react-dom must match React version
+
+# Project Definitions
+projects {
+    core "/Users/johnny/dev/composaic/core"
+    web "/Users/johnny/dev/composaic/web"
+    demo "/Users/johnny/dev/composaic/demo"
+    plugins "/Users/johnny/dev/composaic/demo/applications"
+}
+
+# Context Definitions
+init {
+    context "core" { path "${projects.core}" }
+    context "web" { path "${projects.web}" }
+    context "demo" { path "${projects.demo}" }
+    context "plugins" { path "${projects.plugins}" }
+}
+
+# Task 1 - Update and link dependencies in demo project
+batch "Demo Dependencies Setup" {
+    expect "Demo project dependencies updated and linked with core and web"
+
+    use-context "demo"
+    step "Update Dependencies" {
+        run "npx ncu -u"
+    }
+    step "Install Updated Dependencies" {
+        run "npm install"
+    }
+    step "Fix Security Issues" {
+        run "npm audit fix"
+    }
+    step "Link Core" {
+        run "npm link @composaic/core"
+    }
+    step "Link Web" {
+        run "npm link @composaic/web"
+    }
+    
+    validate {
+        require "Demo dependencies installed"
+        require "Core project linked"
+        require "Web project linked"
+    }
+
+    on_failure {
+        log "Demo setup failed"
+        exit 1
+    }
+}
+
+# Note: The following batches would need to run concurrently in separate terminals
+# Task 2 - Setup Plugin Dependencies
+batch "Plugin Dependencies Setup" {
+    expect "Plugin dependencies installed and linked"
+
+    use-context "plugins"
+    step "Update Plugin Template Dependencies" {
+        run "cd plugin-template && npx ncu -u"
+    }
+    step "Install Plugin Template Dependencies" {
+        run "cd plugin-template && npm install"
+    }
+    step "Link Plugin Template" {
+        run "cd plugin-template && npm link @composaic/core @composaic/web"
+    }
+    
+    step "Update Test Plugin One Dependencies" {
+        run "cd test-plugin-one && npx ncu -u"
+    }
+    step "Install Test Plugin One Dependencies" {
+        run "cd test-plugin-one && npm install"
+    }
+    step "Link Test Plugin One" {
+        run "cd test-plugin-one && npm link @composaic/core @composaic/web"
+    }
+
+    validate {
+        require "Plugin dependencies installed"
+        require "Core and Web linked in plugins"
+    }
+
+    on_failure {
+        log "Plugin setup failed"
+        exit 1
+    }
+}
+
+# Task 3 - Start Development Servers
+batch "Start Core Dev Server" {
+    use-context "core"
+    step "Start Core" {
+        run "npm run start"
+    }
+}
+
+batch "Start Web Dev Server" {
+    use-context "web"
+    step "Start Web" {
+        run "npm run start"
+    }
+}
+
+batch "Start Demo Dev Server" {
+    use-context "demo"
+    step "Start Demo" {
+        run "npm run dev:all"
+    }
+}
+
+# Manual Instructions for Terminal Setup:
+# Terminal 1: cd core && npm run start
+# Terminal 2: cd web && npm run start  
+# Terminal 3: cd demo && npm run dev:all
+# Terminal 4+: For each plugin in demo/applications/*:
+#             cd [plugin-dir] && npm link @composaic/core @composaic/web && npm run start

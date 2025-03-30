@@ -1,6 +1,14 @@
 import { RemoteModuleLoaderService } from '../services/RemoteModuleLoaderService.js';
 import { PluginManager } from '../plugins/PluginManager.js';
-import { PluginDescriptor, PluginManifest } from '../plugins/types.js';
+import {
+    PluginDescriptor,
+    PluginManifest,
+    PluginManifestPlugin,
+    PluginManifestPluginDefinition,
+    PluginManifestExtensionPoints,
+    PluginManifestExtension,
+} from '../plugins/types.js';
+import { Static } from 'runtypes';
 import { RemoteDefinition } from '../services/configuration.js';
 
 export const loadRemotePlugin = async (
@@ -24,47 +32,62 @@ export const convertManifestToPluginDescriptor = (
     manifest: PluginManifest,
     remote?: RemoteDefinition
 ): PluginDescriptor[] => {
-    return manifest.plugins.flatMap((plugin) => {
-        return plugin.definitions.map((definition) => {
-            const result: PluginDescriptor = {
-                module: definition.module,
-                package: definition.package,
-                class: definition.class,
-                plugin: definition.plugin,
-                load: definition.load,
-                version: definition.version,
-                description: definition.description,
-                extensionPoints: definition.extensionPoints?.map(
-                    (extensionPoint) => {
-                        return {
-                            id: extensionPoint.id,
-                            type: extensionPoint.type,
-                        };
-                    }
-                ),
-                extensions: definition.extensions?.map((extension) => {
-                    return {
-                        plugin: extension.plugin,
-                        id: extension.id,
-                        className: extension.className,
-                        meta: extension.meta?.map((meta) => {
-                            return { ...(meta as object) };
-                        }),
+    const validatedManifest = PluginManifest.check(manifest);
+    return validatedManifest.plugins.flatMap(
+        (plugin: Static<typeof PluginManifestPlugin>) => {
+            return plugin.definitions.map(
+                (definition: Static<typeof PluginManifestPluginDefinition>) => {
+                    const result: PluginDescriptor = {
+                        module: definition.module,
+                        package: definition.package,
+                        class: definition.class,
+                        plugin: definition.plugin,
+                        load: definition.load,
+                        version: definition.version,
+                        description: definition.description,
+                        extensionPoints: definition.extensionPoints?.map(
+                            (
+                                extensionPoint: Static<
+                                    typeof PluginManifestExtensionPoints
+                                >
+                            ) => {
+                                return {
+                                    id: extensionPoint.id,
+                                    type: extensionPoint.type,
+                                };
+                            }
+                        ),
+                        extensions: definition.extensions?.map(
+                            (
+                                extension: Static<
+                                    typeof PluginManifestExtension
+                                >
+                            ) => {
+                                return {
+                                    plugin: extension.plugin,
+                                    id: extension.id,
+                                    className: extension.className,
+                                    meta: extension.meta?.map((meta: any) => {
+                                        return { ...(meta as object) };
+                                    }),
+                                };
+                            }
+                        ),
                     };
-                }),
-            };
-            if (remote) {
-                // FIXME - this needs to be properly cleared up - plugins should not define their own remote information at all!
-                // For the time being we will just use the remote information from the configuration and ignore anything in the plugin manifest
-                result.remoteName = remote.name;
-                result.remoteURL = remote.host;
-                result.bundleFile = remote.file;
-                result.remoteModuleName = definition.module;
-                result.loader = loadRemotePlugin;
-            }
-            return result;
-        });
-    });
+                    if (remote) {
+                        // FIXME - this needs to be properly cleared up - plugins should not define their own remote information at all!
+                        // For the time being we will just use the remote information from the configuration and ignore anything in the plugin manifest
+                        result.remoteName = remote.name;
+                        result.remoteURL = remote.host;
+                        result.bundleFile = remote.file;
+                        result.remoteModuleName = definition.module;
+                        result.loader = loadRemotePlugin;
+                    }
+                    return result;
+                }
+            );
+        }
+    );
 };
 
 export type LoadModuleFunction = (

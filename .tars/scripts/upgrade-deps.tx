@@ -3,3 +3,93 @@ version 0.1
 
 name "Dependency Upgrade"
 description "Upgrade dependencies across core, web, and demo projects"
+requires ["npm", "npx", "npm-check-updates"]
+
+# Project paths
+projects {
+    core "/Users/johnny/dev/composaic/core"
+    web "/Users/johnny/dev/composaic/web"
+    demo "/Users/johnny/dev/composaic/demo"
+}
+
+# Terminal definitions with initialization directive
+init {
+    # Create all terminals at startup and validate readiness
+    terminal "core" { 
+        path "${projects.core}"
+        initialize true
+        validate "echo 'Core Terminal Ready'"
+    }
+    terminal "web" { 
+        path "${projects.web}"
+        initialize true
+        validate "echo 'Web Terminal Ready'"
+    }
+    terminal "demo" { 
+        path "${projects.demo}"
+        initialize true
+        validate "echo 'Demo Terminal Ready'"
+    }
+}
+
+# Section 1 - Upgrading Core
+batch "Core Dependencies Upgrade" {
+    expect "Dependencies updated successfully"
+
+    use-terminal "core"
+    step "Check and Install NCU" {
+        run "ncu -v || npm install -g npm-check-updates"
+    }
+
+    step "Update Dependencies" {
+        run "ncu -u"
+    }
+
+    step "Install Updated Packages" {
+        run "npm install"
+    }
+
+    step "Run Security Audit" {
+        run "npm audit fix"
+    }
+
+    validate {
+        require "All dependencies updated"
+        require "No critical vulnerabilities"
+    }
+
+    on_failure {
+        log "Dependency upgrade failed"
+        exit 1
+    }
+}
+
+# Section 2 - Verify Integration
+batch "Integration Check" {
+    expect "All projects integrate successfully"
+
+    use-terminal "core"
+    step "Link Core" {
+        run "npm link"
+    }
+
+    use-terminal "web"
+    step "Link Core in Web" {
+        run "npm link @composaic/core"
+    }
+    step "Verify Web Build" {
+        run "npm install && npm run build"
+    }
+
+    validate {
+        require "Core linked successfully"
+        require "Web project builds with updated core"
+    }
+
+    on_failure {
+        log "Integration verification failed"
+        use-terminal "web"
+        rollback "npm unlink @composaic/core"
+        exit 1
+    }
+}
