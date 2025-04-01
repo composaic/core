@@ -61,7 +61,7 @@ init {
 2. **Context Selection**: Use `use-context` to switch working directory:
 
 ```tarsx
-use-context "core"    # cd to the core context path
+use-context "core"    # Executes 'cd' into the directory path matching the context name defined in the init block
 step "Update Dependencies" {
     run "npm install"  # Runs in current directory
 }

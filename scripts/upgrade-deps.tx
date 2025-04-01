@@ -37,8 +37,8 @@ vars {
 batch "NCU Setup" {
     expect "npm-check-updates is available"
     
-    use-context "core"
     step "Check NCU" {
+        use-context "core"
         run "npx npm-check-updates --version || npm install -g npm-check-updates"
         validate {
             require "npm-check-updates is installed"
@@ -55,8 +55,8 @@ batch "NCU Setup" {
 batch "Core Dependency Check" {
     expect "Core dependencies checked for updates"
 
-    use-context "core"
     step "Update Main Branch" {
+        use-context "core"
         run "git pull origin main"
     }
 
@@ -102,8 +102,8 @@ batch "Core Dependency Check" {
 batch "Web Project Check" {
     expect "Web project dependencies checked"
 
-    use-context "web"
     step "Update Main Branch" {
+        use-context "web"
         run "git pull origin main"
     }
 
@@ -149,8 +149,8 @@ batch "Web Project Check" {
 batch "Demo Project Check" {
     expect "Demo project dependencies checked"
 
-    use-context "demo"
     step "Update Main Branch" {
+        use-context "demo"
         run "git pull origin main"
     }
 
@@ -212,8 +212,8 @@ batch "Integration Tests" when core_updated or web_updated or demo_updated {
     expect "Projects integrate successfully"
 
     when core_updated {
-        use-context "core"
         step "Build Core Project" {
+            use-context "core"
             run "npm run build"
             validate {
                 require "Core build succeeds"
@@ -236,8 +236,8 @@ batch "Integration Tests" when core_updated or web_updated or demo_updated {
     }
 
     when web_updated {
-        use-context "web"
         step "Install Web" {
+            use-context "web"
             run "npm install"
             validate {
                 require "Web dependencies installed"
@@ -269,8 +269,8 @@ batch "Integration Tests" when core_updated or web_updated or demo_updated {
     }
 
     when demo_updated {
-        use-context "demo"
         step "Install Demo" {
+            use-context "demo"
             run "npm install"
             validate {
                 require "Demo dependencies installed"
@@ -312,22 +312,22 @@ batch "Integration Tests" when core_updated or web_updated or demo_updated {
 
         # Clean up feature branches in all updated projects
         when core_updated {
-            use-context "core"
             step "Cleanup Core Branch" {
+                use-context "core"
                 run "git checkout main"
                 run `git branch -D ${branch_name}`
             }
         }
         when web_updated {
-            use-context "web"
             step "Cleanup Web Branch" {
+                use-context "web"
                 run "git checkout main"
                 run `git branch -D ${branch_name}`
             }
         }
         when demo_updated {
-            use-context "demo"
             step "Cleanup Demo Branch" {
+                use-context "demo"
                 run "git checkout main"
                 run `git branch -D ${branch_name}`
             }
