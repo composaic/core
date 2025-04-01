@@ -1,0 +1,117 @@
+# TARSX Conversation Script Language (C) TARS & JJ 2025
+version 0.1
+
+name "Core Project Dependency Upgrade"
+description "Stage 1 - Upgrading Core"
+requires ["npm", "npx"]
+
+# Project Definitions
+projects {
+    core "/Users/johnny/dev/composaic/core"
+    web "/Users/johnny/dev/composaic/web"
+    demo "/Users/johnny/dev/composaic/demo"
+}
+
+# Context Definitions
+init {
+    context "core" { path "${projects.core}" }
+    context "web" { path "${projects.web}" }
+    context "demo" { path "${projects.demo}" }
+}
+
+# Preamble - Check and install ncu if needed
+batch "NCU Setup" {
+    expect "npm-check-updates is available"
+    
+    use-context "core"
+    step "Check NCU" {
+        run "npx npm-check-updates --version || npm install -g npm-check-updates"
+    }
+
+    validate {
+        require "npm-check-updates is installed"
+    }
+
+    on_failure {
+        log "Failed to setup npm-check-updates"
+        exit 1
+    }
+}
+
+# Task 1 - Upgrade dependencies
+batch "Base Dependency Upgrade" {
+    expect "All dependencies updated to compatible versions"
+
+    use-context "core"
+    step "Check Latest Versions" {
+        run "npx ncu -u"
+    }
+
+    step "Install Updates" {
+        run "npm install"
+    }
+
+    step "Security Fixes" {
+        run "npm audit fix"
+    }
+
+    validate {
+        require "No conflicting dependencies"
+        require "All packages installed successfully"
+        require "Security vulnerabilities addressed"
+    }
+
+    on_failure {
+        log "Dependency upgrade failed"
+        exit 1
+    }
+}
+
+# Task 2 - Test core integration with web project
+batch "Web Integration Test" {
+    expect "Core project successfully integrates with web project"
+
+    # Core project tasks
+    use-context "core"
+    step "Install Core Dependencies" {
+        run "npm install"
+    }
+    step "Link Core Project" {
+        run "npm link"
+    }
+
+    # Web project tasks
+    use-context "web"
+    step "Install Web Dependencies" {
+        run "npm install"
+    }
+    step "Link Core to Web" {
+        run "npm link @composaic/core"
+    }
+    step "Run Web Tests" {
+        run "npm test"
+    }
+    step "Build Web Project" {
+        run "npm run build"
+    }
+    
+    step "Link Web Project" {
+        run "npm link"
+    }
+
+    validate {
+        require "Core dependencies installed"
+        require "Core project linked successfully"
+        require "Web dependencies installed"
+        require "Web project links to local core"
+        require "All tests pass"
+        require "Build completes without errors"
+    }
+
+    on_failure {
+        log "Web integration test failed"
+        use-context "web"
+        rollback "npm unlink @composaic/core" # Remove the core link if integration fails
+        exit 1
+    }
+}

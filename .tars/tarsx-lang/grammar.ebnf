@@ -12,7 +12,7 @@
  * - By convention, keywords are written in lowercase
  */
 
-Script ::= Copyright VersionDecl Metadata BatchOperations
+Script ::= Copyright VersionDecl Metadata ProjectDefs? InitBlock BatchOperations
 
 Copyright ::= "#" "TARSX Conversation Script Language (C) TARS & JJ 2025"
 
@@ -21,35 +21,47 @@ VersionDecl ::= "version" "0.1"
 Metadata ::= NameDecl DescriptionDecl ResourcesDecl?
 NameDecl ::= "name" StringLiteral
 DescriptionDecl ::= "description" StringLiteral
-ResourcesDecl ::= "requires" ResourceList  # Define upfront what resources/tools needed
+ResourcesDecl ::= "requires" ResourceList
+
+/* Project Management */
+ProjectDefs ::= "projects" "{" ProjectDef+ "}"
+ProjectDef ::= Identifier StringLiteral
+
+/* Context Management */
+InitBlock ::= "init" "{" ContextDef+ "}"
+ContextDef ::= "context" StringLiteral "{" /* Defines a working directory */
+    "path" StringLiteral
+    "}"
+
+UseContext ::= "use-context" StringLiteral /* Changes working directory */
 
 BatchOperations ::= PrepareBatch* ExecuteBatch*
 
-PrepareBatch ::= "PREPARE" StringLiteral "{" 
+PrepareBatch ::= "prepare" StringLiteral "{" 
     VariableDecls
     InfoGathering?
     "}"
 
 VariableDecls ::= VariableDecl*
-VariableDecl ::= "SET" Identifier "=" Value
+VariableDecl ::= "set" Identifier "=" Value
 
-InfoGathering ::= "GATHER" StringLiteral "{" 
+InfoGathering ::= "gather" StringLiteral "{" 
     ResourceQuery+
     "}"
 
-ResourceQuery ::= "QUERY" StringLiteral "{" 
+ResourceQuery ::= "query" StringLiteral "{" 
     PathPattern
     DataNeeded
     "}"
 
-ExecuteBatch ::= "BATCH" StringLiteral "{"
-    ["EXPECT" StringLiteral]
+ExecuteBatch ::= "batch" StringLiteral "{"
+    ["expect" StringLiteral]
     Operations
     ValidationChecks?
     ErrorHandler?
     "}"
 
-Operations ::= Operation+
+Operations ::= (Operation | UseTerminal)+
 Operation ::= 
     | Step
     | IfStatement
@@ -57,38 +69,40 @@ Operation ::=
     | AskStatement
     | Checkpoint
 
-Step ::= "STEP" StringLiteral "{" 
-    ["EXPECT" StringLiteral]
-    "RUN" StringLiteral
+Step ::= "step" StringLiteral "{" 
+    ["expect" StringLiteral]
+    "run" StringLiteral
     "}"
 
-ErrorHandler ::= "ON_FAILURE" "{" 
-    ["LOG" StringLiteral]
-    ("EXIT" Number | "CONTINUE" | "RETRY")
+ErrorHandler ::= "on_failure" "{" 
+    ["log" StringLiteral]
+    (RollbackCommand | "exit" Number | "continue" | "retry")
     "}"
 
-IfStatement ::= "IF" Condition "{" 
+RollbackCommand ::= "rollback" StringLiteral
+
+IfStatement ::= "if" Condition "{" 
     Operations 
-    "}" ["ELSE" "{" Operations "}"]
+    "}" ["else" "{" Operations "}"]
 
-ForLoop ::= "FOR" Identifier "IN" ListValue "{" 
+ForLoop ::= "for" Identifier "in" ListValue "{" 
     Operations 
     "}"
 
-AskStatement ::= "ASK" StringLiteral "{" 
+AskStatement ::= "ask" StringLiteral "{" 
     OnClause+
-    ["TIMEOUT" Number]
+    ["timeout" Number]
     "}"
 
-OnClause ::= "ON" StringLiteral "->" Operations
+OnClause ::= "on" StringLiteral "->" Operations
 
-Checkpoint ::= "CHECKPOINT" StringLiteral "{" 
+Checkpoint ::= "checkpoint" StringLiteral "{" 
     Requirement+
     "}"
 
-Requirement ::= "REQUIRE" StringLiteral
+Requirement ::= "require" StringLiteral
 
-ValidationChecks ::= "VALIDATE" "{" 
+ValidationChecks ::= "validate" "{" 
     Requirement+
     "}"
 
@@ -107,6 +121,11 @@ Identifier ::= Letter (Letter | Digit | "_")*
 /* Resource Patterns */
 PathPattern ::= StringLiteral ("," StringLiteral)*
 DataNeeded ::= "[" (StringLiteral ("," StringLiteral)*)? "]"
+ResourceList ::= "[" (StringLiteral ("," StringLiteral)*)? "]"
 
 /* Variable Substitution */
-Substitution ::= "${" Identifier "}"
+Substitution ::= "${" (Identifier | (Identifier "." Identifier)) "}"
+
+/* Basic Elements */
+Condition ::= Value ComparisonOp Value
+ComparisonOp ::= "==" | "!=" | ">" | "<" | ">=" | "<="

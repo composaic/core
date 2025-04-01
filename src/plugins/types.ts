@@ -3,9 +3,10 @@ import {
     String,
     Literal,
     Array,
-    Record,
+    Record as RuntypeRecord,
     Static,
     Unknown,
+    Object,
 } from 'runtypes';
 
 export const LogCore = 'core';
@@ -53,15 +54,16 @@ export type Extension = {
     meta?: object;
 };
 
-const PluginManifestExtensionPoints = Record({
+export const PluginManifestExtensionPoints = Object({
     id: String,
     type: String,
+    singleton: Optional(Literal(true)),
 });
 export type PluginManifestExtensionPoints = Static<
     typeof PluginManifestExtensionPoints
 >;
 
-const PluginManifestExtension = Record({
+export const PluginManifestExtension = Object({
     plugin: String,
     id: String,
     className: String,
@@ -69,7 +71,7 @@ const PluginManifestExtension = Record({
 });
 export type PluginManifestExtension = Static<typeof PluginManifestExtension>;
 
-const PluginManifestPluginDefinition = Record({
+export const PluginManifestPluginDefinition = Object({
     package: String,
     module: String,
     class: String,
@@ -84,16 +86,18 @@ export type PluginManifestPluginDefinition = Static<
     typeof PluginManifestPluginDefinition
 >;
 
-const PluginManifestPlugin = Record({
-    remote: Record({
-        name: String,
-        bundleFile: String,
-    }),
+export const RemoteConfig = Object({
+    name: String,
+    bundleFile: String,
+});
+
+export const PluginManifestPlugin = Object({
+    remote: RemoteConfig,
     definitions: Array(PluginManifestPluginDefinition),
 });
 export type PluginManifestPlugin = Static<typeof PluginManifestPlugin>;
 
-const PluginManifest = Record({
+export const PluginManifest = Object({
     plugins: Array(PluginManifestPlugin),
 });
 export type PluginManifest = Static<typeof PluginManifest>;

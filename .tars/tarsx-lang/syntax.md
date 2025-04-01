@@ -10,13 +10,6 @@ TARSX is an instruction set for AI task execution that emphasizes efficient batc
 - String literals and variables are case-sensitive
 - By convention, keywords are written in lowercase
 
-## Core Concepts
-
-- **Batch Operations**: Group related operations together to minimize API calls
-- **Information Gathering**: Collect required data upfront in batches
-- **Resource Definition**: Declare required resources at the start
-- **Efficient Execution**: Optimize operations to minimize tool usage
-
 ## Script Structure
 
 ### Copyright and Version (Required)
@@ -36,6 +29,52 @@ description "Script purpose and functionality"
 requires ["resource1", "resource2"]  # Optional but recommended
 ```
 
+### Project Definitions (Optional)
+
+Projects can be defined to establish directory paths that can be referenced throughout the script:
+
+```tarsx
+projects {
+    core "/path/to/core"
+    web "/path/to/web"
+    demo "/path/to/demo"
+}
+```
+
+### Context Management (Required before commands)
+
+Context management is crucial for command execution in the correct directory.
+
+1. **Defining Contexts**: Use the `context` command to define working directories:
+
+```tarsx
+init {
+    context "core" {
+        path "${projects.core}"
+    }
+    context "web" {
+        path "/direct/path/to/web"
+    }
+}
+```
+
+2. **Context Selection**: Use `use-context` to switch working directory:
+
+```tarsx
+use-context "core"    # cd to the core context path
+step "Update Dependencies" {
+    run "npm install"  # Runs in current directory
+}
+```
+
+Important rules:
+
+- The `context` command defines a named directory path
+- `use-context` changes the current working directory
+- Every command executes in the current working directory
+- Working directory persists until explicitly changed
+- Commands execute sequentially in the same terminal
+
 ## Batch Operations
 
 ### Preparation Phase
@@ -44,15 +83,15 @@ Define variables and gather information upfront:
 
 ```tarsx
 prepare "Setup Environment" {
-  set base_dir = "/path/to/project"
-  set projects = ["core", "web", "demo"]
+    set base_dir = "/path/to/project"
+    set projects = ["core", "web", "demo"]
 
-  gather "Project Information" {
-    query "Package Files" {
-      "*/package.json"
-      ["dependencies", "scripts"]
+    gather "Project Information" {
+        query "Package Files" {
+            "*/package.json"
+            ["dependencies", "scripts"]
+        }
     }
-  }
 }
 ```
 
@@ -62,21 +101,23 @@ Group related operations into batches:
 
 ```tarsx
 batch "Dependency Updates" {
-  expect "All dependencies updated successfully"
+    expect "All dependencies updated successfully"
 
-  step "Update Dependencies" {
-    run "batch-update-command"
-  }
+    use-terminal "core"  # Set terminal context
+    step "Update Dependencies" {
+        run "batch-update-command"
+    }
 
-  validate {
-    require "No conflicting dependencies"
-    require "All packages resolved"
-  }
+    validate {
+        require "No conflicting dependencies"
+        require "All packages resolved"
+    }
 
-  on_failure {
-    log "Batch update failed"
-    exit 1
-  }
+    on_failure {
+        log "Batch update failed"
+        rollback "npm unlink"  # Optional rollback command
+        exit 1
+    }
 }
 ```
 
@@ -86,9 +127,12 @@ batch "Dependency Updates" {
 
 ```tarsx
 if condition {
-  batch "Conditional Operations" {
-    # Batch operations here
-  }
+    batch "Conditional Operations" {
+        use-terminal "core"
+        step "Conditional Step" {
+            run "command"
+        }
+    }
 }
 ```
 
@@ -96,9 +140,12 @@ if condition {
 
 ```tarsx
 for project in ${projects} {
-  batch "Process ${project}" {
-    # Batch operations here
-  }
+    batch "Process ${project}" {
+        use-terminal "${project}"
+        step "Process" {
+            run "command"
+        }
+    }
 }
 ```
 
@@ -106,12 +153,15 @@ for project in ${projects} {
 
 ```tarsx
 ask "Proceed with deployment?" {
-  on "yes" -> {
-    batch "Deployment" {
-      # Deployment operations
+    on "yes" -> {
+        batch "Deployment" {
+            use-terminal "core"
+            step "Deploy" {
+                run "npm run deploy"
+            }
+        }
     }
-  }
-  on "no" -> exit 0
+    on "no" -> exit 0
 }
 ```
 
@@ -123,14 +173,38 @@ ask "Proceed with deployment?" {
 - Objects: `{ "key": "value" }`
 - Booleans: `true`, `false`
 
+## Variable Substitution
+
+Use `${variable_name}` syntax for variables and `${project.path}` for project paths:
+
+```tarsx
+init {
+    terminal "core" {
+        path "${projects.core}"
+        initialize true
+    }
+}
+
+batch "Process ${project}" {
+    use-terminal "core"
+    run "command --path=${base_dir}/${project}"
+}
+```
+
 ## Error Handling
 
 ```tarsx
 batch "Critical Operations" {
-  on_failure {
-    log "Operation failed"
-    exit 1
-  }
+    use-terminal "core"
+    step "Critical Step" {
+        run "critical-command"
+    }
+
+    on_failure {
+        log "Operation failed"
+        rollback "cleanup-command"  # Optional rollback command
+        exit 1
+    }
 }
 ```
 
@@ -138,18 +212,8 @@ batch "Critical Operations" {
 
 ```tarsx
 query "Find Configurations" {
-  "config/*.json"           # Path pattern
-  ["settings", "version"]   # Required data
-}
-```
-
-## Variable Substitution
-
-Use `${variable_name}` syntax:
-
-```tarsx
-batch "Process ${project}" {
-  run "command --path=${base_dir}/${project}"
+    "config/*.json"           # Path pattern
+    ["settings", "version"]   # Required data
 }
 ```
 
@@ -159,6 +223,11 @@ batch "Process ${project}" {
 - name
 - description
 - requires
+- projects
+- init
+- terminal
+- initialize
+- use-terminal
 - prepare
 - gather
 - query
@@ -175,12 +244,17 @@ batch "Process ${project}" {
 - on_failure
 - expect
 - require
+- rollback
 
 ## Best Practices
 
 1. Always declare required resources upfront
-2. Group related operations into batches
-3. Gather information efficiently
-4. Use validation checks for batch operations
-5. Include clear error handling
-6. Add descriptive comments for complex operations
+2. Use init block for terminal definitions and initialization
+3. Always set terminal context before running commands
+4. Group related operations into batches
+5. Gather information efficiently
+6. Use validation checks for batch operations
+7. Include clear error handling
+8. Add descriptive comments for complex operations
+9. Remember all commands execute synchronously
+10. Use project definitions to maintain path consistency
