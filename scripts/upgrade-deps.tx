@@ -6,7 +6,10 @@ description "Checking and upgrading dependencies across all projects"
 requires ["npm", "npx", "git"]
 
 # Import required macros
-import { date } from "./std/datetime"
+import { date, time } from "./std/datetime"
+
+# Helper function to generate unique branch name
+def branch_name = `feature/deps-upgrade-${@date}-${@time}`
 
 # Project Definitions
 projects {
@@ -27,7 +30,7 @@ vars {
     core_updated false
     web_updated false
     demo_updated false
-    reject_deps "@types/react@19.x,@types/react-dom@19.x,react@19.x,react-dom@19.x"
+    exclude_deps "@types/react,@types/react-dom,react,react-dom"
 }
 
 # Preamble - Check and install ncu if needed
@@ -58,11 +61,11 @@ batch "Core Dependency Check" {
     }
 
     step "Create Upgrade Branch" {
-        run `git checkout -b feature/deps-upgrade-${@date}`
+        run `git checkout -b ${branch_name}`
     }
 
     step "Check Latest Versions" {
-        run `npx ncu -u --reject '${reject_deps}'`
+        run `npx ncu -u -x '${exclude_deps}'`
         validate {
             when "All dependencies match the latest package versions" {
                 log "No core updates needed"
@@ -87,6 +90,10 @@ batch "Core Dependency Check" {
 
     on_failure {
         log "Core dependency check failed"
+        step "Cleanup Branch" {
+            run "git checkout main"
+            run `git branch -D ${branch_name}`
+        }
         exit 1
     }
 }
@@ -101,11 +108,11 @@ batch "Web Project Check" {
     }
 
     step "Create Upgrade Branch" {
-        run `git checkout -b feature/deps-upgrade-${@date}`
+        run `git checkout -b ${branch_name}`
     }
 
     step "Check Web Dependencies" {
-        run `npx ncu -u --reject '${reject_deps}'`
+        run `npx ncu -u -x '${exclude_deps}'`
         validate {
             when "All dependencies match the latest package versions" {
                 log "No web updates needed"
@@ -130,6 +137,10 @@ batch "Web Project Check" {
 
     on_failure {
         log "Web project check failed"
+        step "Cleanup Branch" {
+            run "git checkout main"
+            run `git branch -D ${branch_name}`
+        }
         exit 1
     }
 }
@@ -144,11 +155,11 @@ batch "Demo Project Check" {
     }
 
     step "Create Upgrade Branch" {
-        run `git checkout -b feature/deps-upgrade-${@date}`
+        run `git checkout -b ${branch_name}`
     }
 
     step "Check Demo Dependencies" {
-        run `npx ncu -u --reject '${reject_deps}'`
+        run `npx ncu -u -x '${exclude_deps}'`
         validate {
             when "All dependencies match the latest package versions" {
                 log "No demo updates needed"
@@ -173,6 +184,10 @@ batch "Demo Project Check" {
 
     on_failure {
         log "Demo project check failed"
+        step "Cleanup Branch" {
+            run "git checkout main"
+            run `git branch -D ${branch_name}`
+        }
         exit 1
     }
 }
@@ -198,6 +213,20 @@ batch "Integration Tests" when core_updated or web_updated or demo_updated {
 
     when core_updated {
         use-context "core"
+        step "Build Core Project" {
+            run "npm run build"
+            validate {
+                require "Core build succeeds"
+            }
+        }
+
+        step "Test Core Project" {
+            run "npm test"
+            validate {
+                require "Core tests pass"
+            }
+        }
+
         step "Link Core Project" {
             run "npm link"
             validate {
@@ -279,6 +308,29 @@ batch "Integration Tests" when core_updated or web_updated or demo_updated {
         when core_updated or web_updated {
             use-context "demo"
             rollback "npm unlink @composaic/core @composaic/web"
+        }
+
+        # Clean up feature branches in all updated projects
+        when core_updated {
+            use-context "core"
+            step "Cleanup Core Branch" {
+                run "git checkout main"
+                run `git branch -D ${branch_name}`
+            }
+        }
+        when web_updated {
+            use-context "web"
+            step "Cleanup Web Branch" {
+                run "git checkout main"
+                run `git branch -D ${branch_name}`
+            }
+        }
+        when demo_updated {
+            use-context "demo"
+            step "Cleanup Demo Branch" {
+                run "git checkout main"
+                run `git branch -D ${branch_name}`
+            }
         }
         exit 1
     }
