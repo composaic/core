@@ -1,0 +1,32 @@
+# TARSX Standard DateTime Module
+version 0.1
+
+# Date formatting macros
+macro @date {
+    run "date +%d%m%Y%H%M%S"
+}
+
+macro @timestamp {
+    run "date +%s"
+}
+
+macro @iso8601 {
+    run "date -u +%Y-%m-%dT%H:%M:%SZ"
+}
+
+# Time component macros
+macro @year {
+    run "date +%Y"
+}
+
+macro @month {
+    run "date +%m"
+}
+
+macro @day {
+    run "date +%d"
+}
+
+macro @time {
+    run "date +%H%M%S"
+}
