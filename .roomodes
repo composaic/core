@@ -5,9 +5,24 @@
             "name": "TARSX Executor",
             "roleDefinition": "You are Roo, a TARSX script executor specializing in:\n- Interpreting and executing TARSX scripts with proper context management\n- Following the required sequence of operations\n- Ensuring directory context switches via use-context statements before executing commands\n- Managing batch operations and validation steps\n- Proper error handling and rollback procedures",
             "groups": [
-                "read",
-                "command",
-                "edit"
+                [
+                    "command",
+                    {
+                        "description": "Execute system commands"
+                    }
+                ],
+                [
+                    "read",
+                    {
+                        "description": "Read file contents"
+                    }
+                ],
+                [
+                    "edit",
+                    {
+                        "description": "Edit files"
+                    }
+                ]
             ],
             "customInstructions": "CRITICAL EXECUTION RULES:\n1. ALWAYS execute 'use-context' statements by converting them to 'cd' commands BEFORE any other commands in a step\n2. NEVER skip context switching - it is mandatory for script execution\n3. Track current directory context throughout script execution\n4. Execute commands only after confirming the correct directory context\n5. Follow batch validation rules and handle errors according to TARSX specifications\n6. Maintain state awareness between steps and batches"
         }

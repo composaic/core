@@ -86,6 +86,30 @@ batch "Core Dependency Check" {
                 require "All packages installed successfully"
             }
         }
+
+        step "Build Core" {
+            use-context "core"
+            run "npm run build"
+            validate {
+                require "Core build succeeds"
+            }
+        }
+
+        step "Test Core" {
+            use-context "core"
+            run "npm test"
+            validate {
+                require "Core tests pass"
+            }
+        }
+
+        step "Link Core" {
+            use-context "core"
+            run "npm link"
+            validate {
+                require "Core linked successfully"
+            }
+        }
     }
 
     on_failure {
@@ -131,6 +155,32 @@ batch "Web Project Check" {
             run "npm audit fix"
             validate {
                 require "All packages installed successfully"
+            }
+        }
+
+        when core_updated {
+            step "Link Core" {
+                use-context "web"
+                run "npm link @composaic/core"
+                validate {
+                    require "Core linked to web"
+                }
+            }
+        }
+
+        step "Build Web" {
+            use-context "web"
+            run "npm run build"
+            validate {
+                require "Web build succeeds"
+            }
+        }
+
+        step "Link Web" {
+            use-context "web"
+            run "npm link"
+            validate {
+                require "Web linked successfully"
             }
         }
     }
@@ -180,105 +230,10 @@ batch "Demo Project Check" {
                 require "All packages installed successfully"
             }
         }
-    }
-
-    on_failure {
-        log "Demo project check failed"
-        step "Cleanup Branch" {
-            run "git checkout main"
-            run `git branch -D ${branch_name}`
-        }
-        exit 1
-    }
-}
-
-# Check if any updates were found
-batch "Update Summary" {
-    step "Check Updates" {
-        validate {
-            when not core_updated and not web_updated and not demo_updated {
-                log "No updates needed in any project"
-                exit 0
-            }
-            when core_updated or web_updated or demo_updated {
-                log "Updates found, proceeding with integration"
-            }
-        }
-    }
-}
-
-# Task 4 - Integration Tests
-batch "Integration Tests" when core_updated or web_updated or demo_updated {
-    expect "Projects integrate successfully"
-
-    when core_updated {
-        step "Build Core Project" {
-            use-context "core"
-            run "npm run build"
-            validate {
-                require "Core build succeeds"
-            }
-        }
-
-        step "Test Core Project" {
-            run "npm test"
-            validate {
-                require "Core tests pass"
-            }
-        }
-
-        step "Link Core Project" {
-            run "npm link"
-            validate {
-                require "Core linked successfully"
-            }
-        }
-    }
-
-    when web_updated {
-        step "Install Web" {
-            use-context "web"
-            run "npm install"
-            validate {
-                require "Web dependencies installed"
-            }
-        }
 
         when core_updated {
             step "Link Core" {
-                run "npm link @composaic/core"
-                validate {
-                    require "Core linked to web"
-                }
-            }
-        }
-
-        step "Build Web" {
-            run "npm run build"
-            validate {
-                require "Web build succeeds"
-            }
-        }
-
-        step "Link Web Project" {
-            run "npm link"
-            validate {
-                require "Web linked successfully"
-            }
-        }
-    }
-
-    when demo_updated {
-        step "Install Demo" {
-            use-context "demo"
-            run "npm install"
-            validate {
-                require "Demo dependencies installed"
-            }
-        }
-
-        when core_updated {
-            step "Link Core" {
+                use-context "demo"
                 run "npm link @composaic/core"
                 validate {
                     require "Core linked to demo"
@@ -288,6 +243,7 @@ batch "Integration Tests" when core_updated or web_updated or demo_updated {
 
         when web_updated {
             step "Link Web" {
+                use-context "demo"
                 run "npm link @composaic/web"
                 validate {
                     require "Web linked to demo"
@@ -296,6 +252,7 @@ batch "Integration Tests" when core_updated or web_updated or demo_updated {
         }
 
         step "Run Tests" {
+            use-context "demo"
             run "npm test"
             validate {
                 require "Demo tests pass"
@@ -304,34 +261,53 @@ batch "Integration Tests" when core_updated or web_updated or demo_updated {
     }
 
     on_failure {
-        log "Integration tests failed"
+        log "Demo project check failed"
         when core_updated or web_updated {
             use-context "demo"
             rollback "npm unlink @composaic/core @composaic/web"
         }
-
-        # Clean up feature branches in all updated projects
-        when core_updated {
-            step "Cleanup Core Branch" {
-                use-context "core"
-                run "git checkout main"
-                run `git branch -D ${branch_name}`
-            }
-        }
-        when web_updated {
-            step "Cleanup Web Branch" {
-                use-context "web"
-                run "git checkout main"
-                run `git branch -D ${branch_name}`
-            }
-        }
-        when demo_updated {
-            step "Cleanup Demo Branch" {
-                use-context "demo"
-                run "git checkout main"
-                run `git branch -D ${branch_name}`
-            }
+        step "Cleanup Branch" {
+            run "git checkout main"
+            run `git branch -D ${branch_name}`
         }
         exit 1
+    }
+}
+
+# Update Summary
+batch "Update Summary" {
+    step "Check Updates" {
+        validate {
+            when not core_updated and not web_updated and not demo_updated {
+                log "No updates needed in any project"
+                exit 0
+            }
+            when core_updated or web_updated or demo_updated {
+                log "Updates completed successfully"
+
+                # Clean up feature branches in all updated projects
+                when core_updated {
+                    step "Cleanup Core Branch" {
+                        use-context "core"
+                        run "git checkout main"
+                        run `git branch -D ${branch_name}`
+                    }
+                }
+                when web_updated {
+                    step "Cleanup Web Branch" {
+                        use-context "web"
+                        run "git checkout main"
+                        run `git branch -D ${branch_name}`
+                    }
+                }
+                when demo_updated {
+                    step "Cleanup Demo Branch" {
+                        use-context "demo"
+                        run "git checkout main"
+                        run `git branch -D ${branch_name}`
+                    }
+                }
+            }
+        }
     }
 }
