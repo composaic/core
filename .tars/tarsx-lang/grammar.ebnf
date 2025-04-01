@@ -12,7 +12,18 @@
  * - By convention, keywords are written in lowercase
  */
 
-Script ::= Copyright VersionDecl Metadata ProjectDefs? InitBlock BatchOperations
+Script ::= Copyright VersionDecl Metadata Imports? MacroDefs? ProjectDefs? InitBlock BatchOperations
+
+/* Module System */
+Imports ::= Import+
+Import ::= "import" (StringLiteral | "{" ImportList "}") "from" StringLiteral
+ImportList ::= Identifier ("," Identifier)*
+
+/* Macro System */
+MacroDefs ::= MacroDef+
+MacroDef ::= "macro" "@" MacroName "{" MacroBody "}"
+MacroName ::= Identifier
+MacroBody ::= (StringLiteral | Command | Expression)*
 
 Copyright ::= "#" "TARSX Conversation Script Language (C) TARS & JJ 2025"
 
@@ -109,8 +120,12 @@ ValidationChecks ::= "validate" "{"
 Comment ::= "#" Text | "/*" Text "*/"
 
 /* Data Types */
-Value ::= StringLiteral | Number | ListValue | BooleanValue | ObjectValue
+Value ::= StringLiteral | TemplateLiteral | Number | ListValue | BooleanValue | ObjectValue
 StringLiteral ::= '"' Text '"'
+TemplateLiteral ::= '`' (Text | Substitution | MacroSubstitution)* '`'
+MacroSubstitution ::= "${" MacroCall "}"
+MacroCall ::= "@" MacroName
+MacroName ::= Identifier
 Number ::= ["-"] Digit+ ["." Digit+]
 ListValue ::= "[" (Value ("," Value)*)? "]"
 BooleanValue ::= "true" | "false"

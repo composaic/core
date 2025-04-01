@@ -165,6 +165,45 @@ ask "Proceed with deployment?" {
 }
 ```
 
+## Modules and Macros
+
+### Module System
+
+TARSX supports modular code organization through an import system. Modules can contain macro definitions, shared configurations, or reusable operations.
+
+```tarsx
+# Import entire module
+import "std/datetime"
+
+# Import specific macros
+import { date, timestamp } from "std/datetime"
+```
+
+### Macro Definitions
+
+Macros are user-defined expansions that can be imported and reused across scripts. Macros are prefixed with '@' and can contain commands, expressions, or literal values.
+
+```tarsx
+# In datetime.tx
+macro @date {
+    # Macro implementation
+    run "date +%d%m%Y%H%M%S"
+}
+
+macro @timestamp {
+    run "date +%s"
+}
+
+# In your script
+import { date } from "std/datetime"
+
+step "Create Branch" {
+    run `git checkout -b feature/deps-upgrade-${@date}`
+}
+```
+
+Note: Macros must be used within string template literals (denoted by backticks).
+
 ## Data Types
 
 - Strings: `"value"`

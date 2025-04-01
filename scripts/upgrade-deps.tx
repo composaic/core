@@ -3,7 +3,10 @@ version 0.1
 
 name "Core Project Dependency Upgrade"
 description "Stage 1 - Upgrading Core"
-requires ["npm", "npx"]
+requires ["npm", "npx", "git"]
+
+# Import required macros
+import { date } from "./std/datetime"
 
 # Project Definitions
 projects {
@@ -43,6 +46,14 @@ batch "Base Dependency Upgrade" {
     expect "All dependencies updated to compatible versions"
 
     use-context "core"
+    step "Update Main Branch" {
+        run "git pull origin main"
+    }
+
+    step "Create Upgrade Branch" {
+        run `git checkout -b feature/deps-upgrade-${@date}`
+    }
+
     step "Check Latest Versions" {
         run "npx ncu -u"
     }
@@ -82,6 +93,14 @@ batch "Web Integration Test" {
 
     # Web project tasks
     use-context "web"
+    step "Update Main Branch" {
+        run "git pull origin main"
+    }
+
+    step "Create Upgrade Branch" {
+        run `git checkout -b feature/deps-upgrade-${@date}`
+    }
+    
     step "Install Web Dependencies" {
         run "npm install"
     }
@@ -112,6 +131,44 @@ batch "Web Integration Test" {
         log "Web integration test failed"
         use-context "web"
         rollback "npm unlink @composaic/core" # Remove the core link if integration fails
+        exit 1
+    }
+}
+
+# Task 3 - Demo Project Integration
+batch "Demo Integration Test" {
+    expect "Demo project successfully integrates with core and web"
+
+    use-context "demo"
+    step "Update Main Branch" {
+        run "git pull origin main"
+    }
+
+    step "Create Upgrade Branch" {
+        run `git checkout -b feature/deps-upgrade-${@date}`
+    }
+
+    step "Install Demo Dependencies" {
+        run "npm install"
+    }
+
+    step "Link Core and Web" {
+        run "npm link @composaic/core @composaic/web"
+    }
+
+    step "Run Demo Tests" {
+        run "npm test"
+    }
+
+    validate {
+        require "Demo dependencies installed"
+        require "Demo project links to local core and web"
+        require "All tests pass"
+    }
+
+    on_failure {
+        log "Demo integration test failed"
+        rollback "npm unlink @composaic/core @composaic/web"
         exit 1
     }
 }

@@ -71,15 +71,15 @@
         "nodemon": "^3.1.9",
         "prettier": "^3.5.3",
         "rimraf": "^6.0.1",
-        "sass": "^1.86.0",
-        "ts-jest": "^29.3.0",
+        "sass": "^1.86.1",
+        "ts-jest": "^29.3.1",
         "typescript": "^5.8.2",
-        "typescript-eslint": "^8.28.0"
+        "typescript-eslint": "^8.29.0"
     },
     "dependencies": {
         "chokidar": "^4.0.3",
         "commander": "^13.1.0",
-        "express": "^4.21.2",
+        "express": "^5.1.0",
         "mitt": "^3.0.1",
         "reflect-metadata": "^0.2.2",
         "runtypes": "^7.0.4"
