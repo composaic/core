@@ -1,8 +1,8 @@
 # TARSX Conversation Script Language (C) TARS & JJ 2025
 version 0.1
 
-name "Core Project Dependency Upgrade"
-description "Stage 1 - Upgrading Core"
+name "Project Dependencies Upgrade"
+description "Checking and upgrading dependencies across all projects"
 requires ["npm", "npx", "git"]
 
 # Import required macros
@@ -22,6 +22,13 @@ init {
     context "demo" { path "${projects.demo}" }
 }
 
+# Variables for state tracking
+vars {
+    core_updated false
+    web_updated false
+    demo_updated false
+}
+
 # Preamble - Check and install ncu if needed
 batch "NCU Setup" {
     expect "npm-check-updates is available"
@@ -29,10 +36,9 @@ batch "NCU Setup" {
     use-context "core"
     step "Check NCU" {
         run "npx npm-check-updates --version || npm install -g npm-check-updates"
-    }
-
-    validate {
-        require "npm-check-updates is installed"
+        validate {
+            require "npm-check-updates is installed"
+        }
     }
 
     on_failure {
@@ -41,9 +47,9 @@ batch "NCU Setup" {
     }
 }
 
-# Task 1 - Upgrade dependencies
-batch "Base Dependency Upgrade" {
-    expect "All dependencies updated to compatible versions"
+# Task 1 - Check core dependencies
+batch "Core Dependency Check" {
+    expect "Core dependencies checked for updates"
 
     use-context "core"
     step "Update Main Branch" {
@@ -56,42 +62,38 @@ batch "Base Dependency Upgrade" {
 
     step "Check Latest Versions" {
         run "npx ncu -u"
+        validate {
+            when "All dependencies match the latest package versions" {
+                log "No core updates needed"
+                set core_updated = false
+            }
+            when not "All dependencies match the latest package versions" {
+                log "Core updates found"
+                set core_updated = true
+            }
+        }
     }
 
-    step "Install Updates" {
-        run "npm install"
-    }
-
-    step "Security Fixes" {
-        run "npm audit fix"
-    }
-
-    validate {
-        require "No conflicting dependencies"
-        require "All packages installed successfully"
-        require "Security vulnerabilities addressed"
+    when core_updated {
+        step "Install Updates" {
+            run "npm install"
+            run "npm audit fix"
+            validate {
+                require "All packages installed successfully"
+            }
+        }
     }
 
     on_failure {
-        log "Dependency upgrade failed"
+        log "Core dependency check failed"
         exit 1
     }
 }
 
-# Task 2 - Test core integration with web project
-batch "Web Integration Test" {
-    expect "Core project successfully integrates with web project"
+# Task 2 - Check web dependencies
+batch "Web Project Check" {
+    expect "Web project dependencies checked"
 
-    # Core project tasks
-    use-context "core"
-    step "Install Core Dependencies" {
-        run "npm install"
-    }
-    step "Link Core Project" {
-        run "npm link"
-    }
-
-    # Web project tasks
     use-context "web"
     step "Update Main Branch" {
         run "git pull origin main"
@@ -100,44 +102,40 @@ batch "Web Integration Test" {
     step "Create Upgrade Branch" {
         run `git checkout -b feature/deps-upgrade-${@date}`
     }
-    
-    step "Install Web Dependencies" {
-        run "npm install"
-    }
-    step "Link Core to Web" {
-        run "npm link @composaic/core"
-    }
-    step "Run Web Tests" {
-        run "npm test"
-    }
-    step "Build Web Project" {
-        run "npm run build"
-    }
-    
-    step "Link Web Project" {
-        run "npm link"
+
+    step "Check Web Dependencies" {
+        run "npx ncu -u"
+        validate {
+            when "All dependencies match the latest package versions" {
+                log "No web updates needed"
+                set web_updated = false
+            }
+            when not "All dependencies match the latest package versions" {
+                log "Web updates found"
+                set web_updated = true
+            }
+        }
     }
 
-    validate {
-        require "Core dependencies installed"
-        require "Core project linked successfully"
-        require "Web dependencies installed"
-        require "Web project links to local core"
-        require "All tests pass"
-        require "Build completes without errors"
+    when web_updated {
+        step "Install Updates" {
+            run "npm install"
+            run "npm audit fix"
+            validate {
+                require "All packages installed successfully"
+            }
+        }
     }
 
     on_failure {
-        log "Web integration test failed"
-        use-context "web"
-        rollback "npm unlink @composaic/core" # Remove the core link if integration fails
+        log "Web project check failed"
         exit 1
     }
 }
 
-# Task 3 - Demo Project Integration
-batch "Demo Integration Test" {
-    expect "Demo project successfully integrates with core and web"
+# Task 3 - Check demo dependencies
+batch "Demo Project Check" {
+    expect "Demo project dependencies checked"
 
     use-context "demo"
     step "Update Main Branch" {
@@ -148,27 +146,139 @@ batch "Demo Integration Test" {
         run `git checkout -b feature/deps-upgrade-${@date}`
     }
 
-    step "Install Demo Dependencies" {
-        run "npm install"
+    step "Check Demo Dependencies" {
+        run "npx ncu -u"
+        validate {
+            when "All dependencies match the latest package versions" {
+                log "No demo updates needed"
+                set demo_updated = false
+            }
+            when not "All dependencies match the latest package versions" {
+                log "Demo updates found"
+                set demo_updated = true
+            }
+        }
     }
 
-    step "Link Core and Web" {
-        run "npm link @composaic/core @composaic/web"
-    }
-
-    step "Run Demo Tests" {
-        run "npm test"
-    }
-
-    validate {
-        require "Demo dependencies installed"
-        require "Demo project links to local core and web"
-        require "All tests pass"
+    when demo_updated {
+        step "Install Updates" {
+            run "npm install"
+            run "npm audit fix"
+            validate {
+                require "All packages installed successfully"
+            }
+        }
     }
 
     on_failure {
-        log "Demo integration test failed"
-        rollback "npm unlink @composaic/core @composaic/web"
+        log "Demo project check failed"
+        exit 1
+    }
+}
+
+# Check if any updates were found
+batch "Update Summary" {
+    step "Check Updates" {
+        validate {
+            when not core_updated and not web_updated and not demo_updated {
+                log "No updates needed in any project"
+                exit 0
+            }
+            when core_updated or web_updated or demo_updated {
+                log "Updates found, proceeding with integration"
+            }
+        }
+    }
+}
+
+# Task 4 - Integration Tests
+batch "Integration Tests" when core_updated or web_updated or demo_updated {
+    expect "Projects integrate successfully"
+
+    when core_updated {
+        use-context "core"
+        step "Link Core Project" {
+            run "npm link"
+            validate {
+                require "Core linked successfully"
+            }
+        }
+    }
+
+    when web_updated {
+        use-context "web"
+        step "Install Web" {
+            run "npm install"
+            validate {
+                require "Web dependencies installed"
+            }
+        }
+
+        when core_updated {
+            step "Link Core" {
+                run "npm link @composaic/core"
+                validate {
+                    require "Core linked to web"
+                }
+            }
+        }
+
+        step "Build Web" {
+            run "npm run build"
+            validate {
+                require "Web build succeeds"
+            }
+        }
+
+        step "Link Web Project" {
+            run "npm link"
+            validate {
+                require "Web linked successfully"
+            }
+        }
+    }
+
+    when demo_updated {
+        use-context "demo"
+        step "Install Demo" {
+            run "npm install"
+            validate {
+                require "Demo dependencies installed"
+            }
+        }
+
+        when core_updated {
+            step "Link Core" {
+                run "npm link @composaic/core"
+                validate {
+                    require "Core linked to demo"
+                }
+            }
+        }
+
+        when web_updated {
+            step "Link Web" {
+                run "npm link @composaic/web"
+                validate {
+                    require "Web linked to demo"
+                }
+            }
+        }
+
+        step "Run Tests" {
+            run "npm test"
+            validate {
+                require "Demo tests pass"
+            }
+        }
+    }
+
+    on_failure {
+        log "Integration tests failed"
+        when core_updated or web_updated {
+            use-context "demo"
+            rollback "npm unlink @composaic/core @composaic/web"
+        }
         exit 1
     }
 }
