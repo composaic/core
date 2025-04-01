@@ -27,6 +27,7 @@ vars {
     core_updated false
     web_updated false
     demo_updated false
+    reject_deps "@types/react@19.x,@types/react-dom@19.x,react@19.x,react-dom@19.x"
 }
 
 # Preamble - Check and install ncu if needed
@@ -61,7 +62,7 @@ batch "Core Dependency Check" {
     }
 
     step "Check Latest Versions" {
-        run "npx ncu -u"
+        run `npx ncu -u --reject '${reject_deps}'`
         validate {
             when "All dependencies match the latest package versions" {
                 log "No core updates needed"
@@ -104,7 +105,7 @@ batch "Web Project Check" {
     }
 
     step "Check Web Dependencies" {
-        run "npx ncu -u"
+        run `npx ncu -u --reject '${reject_deps}'`
         validate {
             when "All dependencies match the latest package versions" {
                 log "No web updates needed"
@@ -147,7 +148,7 @@ batch "Demo Project Check" {
     }
 
     step "Check Demo Dependencies" {
-        run "npx ncu -u"
+        run `npx ncu -u --reject '${reject_deps}'`
         validate {
             when "All dependencies match the latest package versions" {
                 log "No demo updates needed"
