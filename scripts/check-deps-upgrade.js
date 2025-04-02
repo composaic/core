@@ -62,7 +62,9 @@ function execCommand(command, options = {}, dryRun = false, verbose = false) {
         // Execute command
         const result = execSync(command, {
             stdio: 'inherit',
+            shell: true,
             ...options,
+            env: { ...process.env, PATH: process.env.PATH },
         });
 
         // Return to original directory
