@@ -28,9 +28,11 @@ const PROJECTS = {
     },
     'plugin-template': {
         path: 'demo/applications/plugin-template',
+        noTests: true,
     },
     'test-plugin-one': {
         path: 'demo/applications/test-plugin-one',
+        noTests: true,
     },
 };
 
@@ -147,13 +149,19 @@ async function buildProjectAndDeps(
             );
         }
 
-        // Test
-        console.log(`\n🧪 Running tests for ${project}...`);
-        try {
-            execCommand('npm test', { cwd: absPath }, dryRun, verbose);
-        } catch (error) {
-            throw new Error(
-                `Tests failed for ${project}. Fix failing tests before proceeding.`
+        // Test (skip if noTests is true)
+        if (!PROJECTS[project].noTests) {
+            console.log(`\n🧪 Running tests for ${project}...`);
+            try {
+                execCommand('npm test', { cwd: projectPath }, dryRun, verbose);
+            } catch (error) {
+                throw new Error(
+                    `Tests failed for ${project}. Fix failing tests before proceeding.`
+                );
+            }
+        } else {
+            console.log(
+                `\n⏩ Skipping tests for ${project} (noTests is set)...`
             );
         }
 
