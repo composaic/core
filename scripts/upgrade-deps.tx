@@ -52,7 +52,7 @@ batch "NCU Setup" {
 }
 
 # Task 1 - Check core dependencies
-batch "Core Dependency Check" {
+batch "Update Core Project" {
     expect "Core dependencies checked for updates"
 
     step "Update Main Branch" {
