@@ -112,7 +112,13 @@ async function buildProjectAndDeps(
         console.log(`\n📦 Installing dependencies...`);
         execCommand('npm install', { cwd: absPath }, dryRun, verbose);
         console.log(`\n🔒 Running security audit fixes...`);
-        execCommand('npm audit fix', { cwd: absPath }, dryRun, verbose);
+        try {
+            execCommand('npm audit fix', { cwd: projectPath }, dryRun, verbose);
+        } catch (error) {
+            console.warn(
+                '\n⚠️  Security audit fix failed, continuing anyway...'
+            );
+        }
 
         // Link any required dependencies
         const dependencies = getDependencies(project);
