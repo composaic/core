@@ -113,7 +113,7 @@ async function buildProjectAndDeps(
         execCommand('npm install', { cwd: absPath }, dryRun, verbose);
         console.log(`\n🔒 Running security audit fixes...`);
         try {
-            execCommand('npm audit fix', { cwd: projectPath }, dryRun, verbose);
+            execCommand('npm audit fix', { cwd: absPath }, dryRun, verbose);
         } catch (error) {
             console.warn(
                 '\n⚠️  Security audit fix failed, continuing anyway...'
