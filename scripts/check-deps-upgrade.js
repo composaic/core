@@ -44,6 +44,7 @@ function getDependencies(project) {
 function execCommand(command, options = {}, dryRun = false, verbose = false) {
     const targetDir = options.cwd ? options.cwd : process.cwd();
     const originalDir = process.cwd();
+    const { exitOnError = true } = options;
 
     if (dryRun) {
         console.log(`Would execute: ${command} in ${targetDir}`);
@@ -82,7 +83,9 @@ function execCommand(command, options = {}, dryRun = false, verbose = false) {
 
         // Ensure we return to original directory even if command fails
         process.chdir(originalDir);
-        process.exit(1);
+        if (exitOnError) {
+            process.exit(1);
+        }
     }
 }
 
@@ -112,13 +115,12 @@ async function buildProjectAndDeps(
         console.log(`\n📦 Installing dependencies...`);
         execCommand('npm install', { cwd: absPath }, dryRun, verbose);
         console.log(`\n🔒 Running security audit fixes...`);
-        try {
-            execCommand('npm audit fix', { cwd: absPath }, dryRun, verbose);
-        } catch (error) {
-            console.warn(
-                '\n⚠️  Security audit fix failed, continuing anyway...'
-            );
-        }
+        execCommand(
+            'npm audit fix',
+            { cwd: projectPath, exitOnError: false },
+            dryRun,
+            verbose
+        );
 
         // Link any required dependencies
         const dependencies = getDependencies(project);
