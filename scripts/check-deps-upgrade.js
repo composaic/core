@@ -5,14 +5,12 @@ const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-// The base directory where all projects are located
-const BASE_DIR = process.cwd();
+// Get composaic root directory (parent of core)
+const COMPOSAIC_ROOT = path.dirname(process.cwd());
 
 // Helper function to get absolute path for a project
 function getProjectPath(projectPath) {
-    // Go up one directory from core to get to composaic root
-    const composaixRoot = path.dirname(BASE_DIR);
-    return path.join(composaixRoot, projectPath);
+    return path.resolve(COMPOSAIC_ROOT, projectPath);
 }
 
 // Project configuration
