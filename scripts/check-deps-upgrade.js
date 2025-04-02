@@ -119,7 +119,7 @@ async function buildProjectAndDeps(
         console.log(`\n🔒 Running security audit fixes...`);
         execCommand(
             'npm audit fix',
-            { cwd: projectPath, exitOnError: false },
+            { cwd: absPath, exitOnError: false },
             dryRun,
             verbose
         );
@@ -153,7 +153,7 @@ async function buildProjectAndDeps(
         if (!PROJECTS[project].noTests) {
             console.log(`\n🧪 Running tests for ${project}...`);
             try {
-                execCommand('npm test', { cwd: projectPath }, dryRun, verbose);
+                execCommand('npm test', { cwd: absPath }, dryRun, verbose);
             } catch (error) {
                 throw new Error(
                     `Tests failed for ${project}. Fix failing tests before proceeding.`
