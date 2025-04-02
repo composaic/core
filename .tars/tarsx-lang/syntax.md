@@ -123,6 +123,35 @@ batch "Dependency Updates" {
 
 ## Control Structures
 
+### When Blocks (CRITICAL)
+
+The `when` block is a special conditional structure that must execute ALL steps contained within it if the condition is true. This is crucial for proper script execution:
+
+```tarsx
+when condition {
+    step "First Step" {
+        run "command1"
+    }
+    step "Second Step" {
+        run "command2"
+    }
+    step "Third Step" {
+        run "command3"
+    }
+}
+```
+
+IMPORTANT:
+
+- ALL steps within a when block MUST be executed if the condition is true
+- Each step can have its own context, commands, and validations
+- Steps execute sequentially but are all part of the same conditional block
+- Do not stop after the first step
+- Each step's validation must be checked
+- Context switches (use-context) within steps must be respected
+
+## Control Structures
+
 ### Conditional Execution
 
 ```tarsx
