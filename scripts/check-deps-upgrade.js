@@ -108,9 +108,9 @@ async function buildProjectAndDeps(
 
         // Install dependencies and run security fixes
         console.log(`\n📦 Installing dependencies...`);
-        execCommand('npm install', { cwd: absPath }, dryRun, verbose);
+        execCommand('npm install', { cwd: projectPath }, dryRun, verbose);
         console.log(`\n🔒 Running security audit fixes...`);
-        execCommand('npm audit fix', { cwd: absPath }, dryRun, verbose);
+        execCommand('npm audit fix', { cwd: projectPath }, dryRun, verbose);
 
         // Link any required dependencies
         const dependencies = getDependencies(project);
@@ -120,7 +120,7 @@ async function buildProjectAndDeps(
                 console.log(`Linking ${dep}`);
                 execCommand(
                     `npm link @composaic/${dep}`,
-                    { cwd: absPath },
+                    { cwd: projectPath },
                     dryRun,
                     verbose
                 );
@@ -130,7 +130,7 @@ async function buildProjectAndDeps(
         // Build
         console.log(`\n🏗️  Building ${project}...`);
         try {
-            execCommand('npm run build', { cwd: absPath }, dryRun, verbose);
+            execCommand('npm run build', { cwd: projectPath }, dryRun, verbose);
         } catch (error) {
             throw new Error(
                 `Build failed for ${project}. Fix build errors before proceeding.`
@@ -140,7 +140,7 @@ async function buildProjectAndDeps(
         // Test
         console.log(`\n🧪 Running tests for ${project}...`);
         try {
-            execCommand('npm test', { cwd: absPath }, dryRun, verbose);
+            execCommand('npm test', { cwd: projectPath }, dryRun, verbose);
         } catch (error) {
             throw new Error(
                 `Tests failed for ${project}. Fix failing tests before proceeding.`
@@ -150,7 +150,7 @@ async function buildProjectAndDeps(
         // If this is a dependency (like core or web), make it available for linking
         if (PROJECTS[project].dependents) {
             console.log(`\n🔗 Making ${project} available for linking`);
-            execCommand('npm link', { cwd: absPath }, dryRun, verbose);
+            execCommand('npm link', { cwd: projectPath }, dryRun, verbose);
         }
 
         console.log(`\n✅ ${project} processed successfully`);
