@@ -24,6 +24,7 @@
         "manifest-gen": "./dist/cjs/plugin-system/cli.js"
     },
     "scripts": {
+        "check-deps": "node ./scripts/check-deps-upgrade.js",
         "build:cjs": "tsc -p tsconfig.cjs.json && chmod +x ./dist/cjs/plugin-system/cli.js",
         "build:esm": "tsc -p tsconfig.esm.json && npm run rename:esm",
         "build:types": "tsc --emitDeclarationOnly --declaration -p tsconfig.json --outDir dist/types",
