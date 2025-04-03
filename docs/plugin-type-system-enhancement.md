@@ -1,189 +1,279 @@
-# Plugin System Type and Version Enhancement Plan
+# Plugin System Type Enhancement
 
-## Overview
+This document outlines the plan to enhance type safety in the Composaic plugin system, focusing on extension point compatibility and parameter validation.
 
-This document outlines the plan for enhancing the Composaic plugin system with stronger runtime type checking and version compatibility validation for plugin extensions.
+## Current Challenges
 
-## Current State Analysis
+The current plugin system has several areas where type safety could be improved:
 
-The current plugin system has basic type support:
-
-- Extensions are defined with ID and type strings
-- No runtime type validation during extension connections
-- No version compatibility checking
-- Uses runtypes for manifest validation only
+1. Extension point types are defined as simple strings, lacking proper type checking
+2. No strict type validation between extension implementations and their extension points
+3. No enforcement of method parameter arity or types
+4. Loose typing in extension metadata allows unchecked properties
 
 ## Proposed Enhancements
 
-### 1. Enhanced Type Definition System
+### 1. Type-Safe Extension Points
+
+Extension points will be enhanced to support proper typing of their interfaces and data:
 
 ```typescript
-interface ExtensionPointTypeDefinition {
+// Base interface for all extension points
+interface ExtensionPoint<TData = unknown, TConfig = unknown> {
     id: string;
-    schema: TypeSchema; // JSON Schema for runtime validation
-    version: string; // Semver version
-    requiredVersion?: string; // Minimum required version
+    activate(data: TData): void;
+    configure(config: TConfig): void;
 }
 
-interface TypeSchema {
-    properties: {
-        [key: string]: {
-            type: string;
-            required?: boolean;
-            items?: TypeSchema; // For arrays
-        };
-    };
-    methods?: {
-        [key: string]: {
-            parameters: TypeSchema[];
-            returnType: TypeSchema;
-        };
-    };
+// Enhanced metadata with type information
+interface ExtensionPointMetadata<T extends ExtensionPoint = ExtensionPoint> {
+    id: string;
+    type: Constructor<T>;
+    methods: MethodDescriptor[];
+}
+
+// Method description for runtime validation
+interface MethodDescriptor {
+    name: string;
+    parameters: ParameterDescriptor[];
+    returnType?: TypeDescriptor;
+    required: boolean;
+}
+
+interface ParameterDescriptor {
+    name: string;
+    type: TypeDescriptor;
+    required: boolean;
 }
 ```
 
-### 2. Version Compatibility System
+This enhancement provides:
+
+- Type-safe extension point definitions
+- Runtime method validation
+- Clear interface requirements for implementations
+
+### 2. Typed Extension Implementations
+
+Extensions will be strictly typed to match their extension points:
 
 ```typescript
-interface VersionRequirement {
-    minVersion: string;
-    maxVersion?: string;
-    excludeVersions?: string[];
+interface ExtensionMetadata<T extends ExtensionPoint = ExtensionPoint> {
+    plugin: string;
+    id: string;
+    className: string;
+    implements: Constructor<T>;
+    configuration?: unknown;
 }
 
-interface ExtensionVersionMetadata {
-    provides: string; // Version this extension implements
-    requires: VersionRequirement;
+// Enhanced extension decorator
+function Extension<T extends ExtensionPoint>(metadata: ExtensionMetadata<T>) {
+    return function (target: Constructor<T>) {
+        validateImplementation(target, metadata.implements);
+        Reflect.defineMetadata('extension:metadata', metadata, target);
+    };
 }
 ```
 
-### 3. Runtime Validation Implementation
+Benefits:
 
-Key components:
+- Compile-time type checking of implementations
+- Runtime validation of extension point compatibility
+- Type-safe configuration options
 
-- Type checking during extension registration
-- Validation against declared schemas
-- Version compatibility verification
-- Type validation caching
-- Error handling system
+### 3. Runtime Type Validation
 
-### 4. Integration Points
+A comprehensive type validation system will be implemented:
 
-- Enhanced PluginManager extension loading
-- Plugin base class validation hooks
-- Type registration during initialization
-- Version resolution system
+```typescript
+// Type validation utilities
+interface TypeValidator {
+    validate(value: unknown): boolean;
+    describe(): TypeDescriptor;
+}
+
+class RuntimeTypeChecker {
+    validateMethod(
+        target: object,
+        methodName: string,
+        args: unknown[],
+        descriptor: MethodDescriptor
+    ): void {
+        // Validate parameter count
+        if (
+            args.length < descriptor.parameters.filter((p) => p.required).length
+        ) {
+            throw new Error(`Missing required parameters for ${methodName}`);
+        }
+
+        // Validate parameter types
+        args.forEach((arg, index) => {
+            const param = descriptor.parameters[index];
+            if (param && !this.validateType(arg, param.type)) {
+                throw new Error(
+                    `Invalid type for parameter ${param.name} in ${methodName}`
+                );
+            }
+        });
+    }
+
+    validateType(value: unknown, type: TypeDescriptor): boolean {
+        // Type validation logic
+    }
+}
+```
+
+This provides:
+
+- Runtime type checking of method calls
+- Validation of parameter types and counts
+- Clear error messages for type mismatches
+
+### 4. Plugin Manager Integration
+
+The PluginManager class will be enhanced to handle typed extensions:
+
+```typescript
+class PluginManager {
+    // Type-safe extension point registration
+    registerExtensionPoint<T extends ExtensionPoint>(
+        metadata: ExtensionPointMetadata<T>
+    ): void;
+
+    // Type-safe extension registration
+    registerExtension<T extends ExtensionPoint>(
+        extension: Constructor<T>,
+        metadata: ExtensionMetadata<T>
+    ): void;
+
+    // Type-safe extension point lookup
+    getExtensionPoint<T extends ExtensionPoint>(id: string): T | undefined;
+}
+```
+
+### 5. Migration Strategy
+
+To ensure a smooth transition for existing plugins:
+
+1. **Compatibility Layer**
+
+    ```typescript
+    // Wrapper for legacy extension points
+    class LegacyExtensionPointWrapper implements ExtensionPoint {
+        constructor(private legacy: any) {}
+
+        activate(data: unknown): void {
+            // Forward to legacy implementation
+            this.legacy.activate(data);
+        }
+    }
+    ```
+
+2. **Migration Utilities**
+
+    - Tools to analyze existing plugins
+    - Type generation helpers
+    - Automated upgrade scripts
+
+3. **Documentation**
+    - Migration guides for plugin authors
+    - Best practices for new plugins
+    - Type system reference
 
 ## Implementation Phases
 
-### Phase 1: Core Type System
+1. **Phase 1: Core Type System**
 
-- Implement ExtensionPointTypeDefinition
-- Create TypeRegistry service
-- Add basic type validation
+    - Implement new interfaces and type validators
+    - Create base extension point classes
+    - Add runtime type checking utilities
 
-### Phase 2: Version Management
+2. **Phase 2: Plugin Manager Updates**
 
-- Add version compatibility checking
-- Implement SemVer validation
-- Build version resolution system
+    - Update plugin registration system
+    - Add type-safe extension point lookup
+    - Implement runtime validation
 
-### Phase 3: Runtime Validation
+3. **Phase 3: Migration Support**
 
-- Implement runtime type checking
-- Add validation to extension loading
-- Create error handling system
+    - Create compatibility layer
+    - Develop migration utilities
+    - Update documentation
 
-### Phase 4: Migration & Documentation
-
-- Create migration utilities
-- Update documentation
-- Add examples for type definitions
+4. **Phase 4: Testing and Validation**
+    - Add type system test suite
+    - Validate with existing plugins
+    - Performance testing
 
 ## Example Usage
 
-```typescript
-@ExtensionPoint({
-    id: 'navbar.item',
-    schema: {
-        properties: {
-            label: { type: 'string', required: true },
-            icon: { type: 'string' },
-            onClick: {
-                type: 'function',
-                parameters: [{ type: 'object' }],
-                returnType: { type: 'void' },
-            },
-        },
-    },
-    version: '1.0.0',
-    requiredVersion: '>=1.0.0',
-})
-class NavbarExtensionPoint {}
+Here's how the enhanced type system would be used:
 
-@Extension({
-    point: 'navbar.item',
-    provides: '1.0.0',
-    requires: {
-        minVersion: '1.0.0',
-    },
+```typescript
+// Define extension point interface
+interface NavbarItem {
+    text: string;
+    url: string;
+}
+
+// Create typed extension point
+@ExtensionPoint<NavbarItem>({
+    id: 'navbar',
+    methods: [
+        {
+            name: 'render',
+            parameters: [
+                { name: 'container', type: 'HTMLElement', required: true },
+            ],
+            returnType: 'void',
+            required: true,
+        },
+    ],
 })
-class CustomNavbarItem implements NavbarItemInterface {}
+class NavbarExtensionPoint implements ExtensionPoint<NavbarItem> {
+    activate(data: NavbarItem): void {
+        // Implementation
+    }
+}
+
+// Create typed extension
+@Extension<NavbarExtensionPoint>({
+    plugin: 'my-plugin',
+    id: 'custom-navbar',
+    implements: NavbarExtensionPoint,
+})
+class CustomNavbar implements NavbarExtensionPoint {
+    activate(data: NavbarItem): void {
+        // Type-safe implementation
+    }
+
+    render(container: HTMLElement): void {
+        // Type-safe render method
+    }
+}
 ```
 
-## Technical Details
+## Benefits
 
-### Type Registry
+1. **Improved Type Safety**
 
-The TypeRegistry service will:
+    - Compile-time type checking
+    - Runtime validation
+    - Clear interface contracts
 
-1. Store and manage type definitions
-2. Handle type resolution
-3. Validate extension implementations
-4. Cache validated types
-5. Manage version compatibility
+2. **Better Developer Experience**
 
-### Version Management
+    - IDE autocompletion
+    - Clear error messages
+    - Self-documenting interfaces
 
-Version compatibility will use SemVer rules:
+3. **Robust Plugin System**
 
-- Major version changes indicate breaking changes
-- Minor versions must be backward compatible
-- Patch versions must be fully compatible
+    - Validated extension compatibility
+    - Safe method calls
+    - Controlled breaking changes
 
-### Error Handling
-
-The system will provide detailed error messages for:
-
-- Type mismatches
-- Version incompatibilities
-- Missing required properties
-- Invalid method signatures
-
-## Migration Strategy
-
-1. Make changes backward compatible:
-
-    - Optional strict mode for new features
-    - Fallback to current behavior if types not defined
-
-2. Provide migration utilities:
-
-    - Type definition generators
-    - Validation testing tools
-    - Compatibility checkers
-
-3. Documentation updates:
-    - Migration guides
-    - Best practices
-    - Type system reference
-    - Example implementations
-
-## Next Steps
-
-1. Review and approve implementation plan
-2. Set up type registry infrastructure
-3. Implement core type validation
-4. Add version compatibility system
-5. Create migration utilities
-6. Update documentation
+4. **Future-Proof Design**
+    - Extensible type system
+    - Version compatibility
+    - Migration path for updates
