@@ -18,11 +18,11 @@
  *      - [plugin-template]: npm i, npm run build
  *      - [demo]: npm i, npm run build
  *   - end-if
- *   - npm run serve in [demo], [test-plugin-one], [plugin-template]
+ *   - npm run serve in [demo], [test-plugin-one], [plugin-template] (start all servers in parallel)
  */
 
 const { program } = require('commander');
-const { execSync } = require('child_process');
+const { execSync, spawn } = require('child_process');
 const path = require('path');
 
 // Get composaic root directory (parent of core)
@@ -73,9 +73,43 @@ function buildProject(project, dryRun) {
     execCommand('npm run build', PROJECTS[project], dryRun);
 }
 
-function runServer(project, dryRun) {
-    console.log(`\n🚀 Starting server for ${project}...`);
-    execCommand('npm run serve', PROJECTS[project], dryRun);
+function spawnServer(project, dryRun) {
+    return new Promise((resolve, reject) => {
+        const targetDir = getProjectPath(PROJECTS[project]);
+        console.log(`\n🚀 Starting server for ${project}...`);
+        console.log(`\n🔧 Executing: npm run serve in ${targetDir}`);
+
+        if (dryRun) {
+            console.log(`Would execute: npm run serve in ${targetDir}`);
+            resolve();
+            return;
+        }
+
+        const child = spawn('npm', ['run', 'serve'], {
+            cwd: targetDir,
+            stdio: 'inherit',
+            shell: true,
+            env: { ...process.env, PATH: process.env.PATH },
+        });
+
+        child.on('error', (error) => {
+            console.error(`\n❌ Error starting server for ${project}:`, error);
+            reject(error);
+        });
+
+        // Don't resolve the promise as we want to keep the servers running
+        child.on('exit', (code) => {
+            if (code !== 0 && code !== null) {
+                console.error(
+                    `\n❌ Server for ${project} exited with code ${code}`
+                );
+                reject(new Error(`Server ${project} failed with code ${code}`));
+            }
+        });
+
+        // Resolve after a short delay to allow for startup
+        setTimeout(() => resolve(child), 1000);
+    });
 }
 
 async function buildAllProjects(dryRun = false) {
@@ -88,10 +122,18 @@ async function buildAllProjects(dryRun = false) {
 }
 
 async function runAllServers(dryRun = false) {
-    console.log('\n🖥️  Starting servers...');
-    runServer('demo', dryRun);
-    runServer('test-plugin-one', dryRun);
-    runServer('plugin-template', dryRun);
+    console.log('\n🖥️  Starting all servers in parallel...');
+    const servers = ['demo', 'test-plugin-one', 'plugin-template'];
+
+    try {
+        await Promise.all(
+            servers.map((project) => spawnServer(project, dryRun))
+        );
+        console.log('\n✅ All servers started successfully');
+    } catch (error) {
+        console.error('\n❌ Failed to start servers:', error);
+        process.exit(1);
+    }
 }
 
 async function execute(options) {
@@ -120,6 +162,9 @@ async function execute(options) {
 
     if (dryRun) {
         console.log('\n📋 End of Dry Run - No commands were executed');
+    } else {
+        console.log('\n🎉 All operations completed successfully');
+        console.log('Press Ctrl+C to stop all servers');
     }
 }
 
