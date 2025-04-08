@@ -8,7 +8,7 @@ import {
     PluginManifestExtensionPoints,
     PluginManifestExtension,
 } from '../plugins/types.js';
-import { Static } from 'runtypes';
+import { z } from 'zod';
 import { RemoteDefinition } from '../services/configuration.js';
 
 export const loadRemotePlugin = async (
@@ -32,11 +32,13 @@ export const convertManifestToPluginDescriptor = (
     manifest: PluginManifest,
     remote?: RemoteDefinition
 ): PluginDescriptor[] => {
-    const validatedManifest = PluginManifest.check(manifest);
+    const validatedManifest = PluginManifest.parse(manifest);
     return validatedManifest.plugins.flatMap(
-        (plugin: Static<typeof PluginManifestPlugin>) => {
+        (plugin: z.infer<typeof PluginManifestPlugin>) => {
             return plugin.definitions.map(
-                (definition: Static<typeof PluginManifestPluginDefinition>) => {
+                (
+                    definition: z.infer<typeof PluginManifestPluginDefinition>
+                ) => {
                     const result: PluginDescriptor = {
                         module: definition.module,
                         package: definition.package,
@@ -47,7 +49,7 @@ export const convertManifestToPluginDescriptor = (
                         description: definition.description,
                         extensionPoints: definition.extensionPoints?.map(
                             (
-                                extensionPoint: Static<
+                                extensionPoint: z.infer<
                                     typeof PluginManifestExtensionPoints
                                 >
                             ) => {
@@ -59,7 +61,7 @@ export const convertManifestToPluginDescriptor = (
                         ),
                         extensions: definition.extensions?.map(
                             (
-                                extension: Static<
+                                extension: z.infer<
                                     typeof PluginManifestExtension
                                 >
                             ) => {

@@ -8,17 +8,21 @@
  * 2. required command line arguments
  *  -h --help display bried description and list the options with explanation (pretty print)
  *  -d --dry-run dry run the script without executing any commands
- *  -b --build-and-run build the projects and run servers
+ *  -b --build build the projects
+ *  -r --run-servers run the servers
  * If no option specified default to -h explaining that to run the script you either need to specify -d or -b
  * 2. Steps
- *   - if -b --build-and-run is specified
+ *   - if -b --build is specified
  *      - [core]: npm i, npm run build, then npm link
  *      - [web]: npm i, npm link @composaic/core, then npm run build, finally npm link
  *      - [test-plugin-one]: npm i, npm link @composaic/core, @composaic/web
  *      - [plugin-template]: npm i, npm link @composaic/core, @composaic/web
  *      - [demo]: npm i, npm link @composaic/core, @composaic/web
  *   - end-if
- *   - npm start in [demo], [test-plugin-one], [plugin-template] (start all servers in parallel)
+ *   - if -r
+ *      - npm run start in [demo], [test-plugin-one], [plugin-template] (start all servers in parallel)
+ *   - else
+ *      - npm run build in [demo], [test-plugin-one], [plugin-template] (you can run these 3 commands sequentially)
  */
 
 const { program } = require('commander');
@@ -113,19 +117,21 @@ function buildProject(project, dryRun) {
     }
 }
 
-function spawnServer(project, dryRun) {
+function runProjectCommand(project, command, dryRun, isServer = true) {
     return new Promise((resolve, reject) => {
         const targetDir = getProjectPath(PROJECTS[project].path);
-        console.log(`\n🚀 Starting development server for ${project}...`);
-        console.log(`\n🔧 Executing: npm start in ${targetDir}`);
+        console.log(
+            `\n${isServer ? '🚀 Starting development server' : '🏗️  Building webpack bundle'} for ${project}...`
+        );
+        console.log(`\n🔧 Executing: npm run ${command} in ${targetDir}`);
 
         if (dryRun) {
-            console.log(`Would execute: npm start in ${targetDir}`);
+            console.log(`Would execute: npm run ${command} in ${targetDir}`);
             resolve();
             return;
         }
 
-        const child = spawn('npm', ['start'], {
+        const child = spawn('npm', ['run', command], {
             cwd: targetDir,
             stdio: 'inherit',
             shell: true,
@@ -133,51 +139,76 @@ function spawnServer(project, dryRun) {
         });
 
         child.on('error', (error) => {
-            console.error(`\n❌ Error starting server for ${project}:`, error);
+            console.error(
+                `\n❌ Error ${isServer ? 'starting server' : 'building'} for ${project}:`,
+                error
+            );
             reject(error);
         });
 
         child.on('exit', (code) => {
             if (code !== 0 && code !== null) {
                 console.error(
-                    `\n❌ Server for ${project} exited with code ${code}`
+                    `\n❌ ${isServer ? 'Server' : 'Build'} for ${project} exited with code ${code}`
                 );
-                reject(new Error(`Server ${project} failed with code ${code}`));
+                reject(
+                    new Error(
+                        `${isServer ? 'Server' : 'Build'} ${project} failed with code ${code}`
+                    )
+                );
+            } else {
+                if (!isServer) {
+                    resolve(); // For builds, resolve immediately
+                } else {
+                    // For servers, resolve after a delay to allow startup
+                    setTimeout(() => resolve(child), 1000);
+                }
             }
         });
-
-        // Resolve after a short delay to allow for startup
-        setTimeout(() => resolve(child), 1000);
     });
 }
 
-async function buildAllProjects(dryRun = false) {
-    // Build in specific order due to dependencies
-    console.log('\n📦 Building all projects in order...');
+async function buildFramework(dryRun = false) {
+    // Build only core and web projects
+    console.log('\n📦 Building core projects...');
     buildProject('core', dryRun);
     buildProject('web', dryRun);
-    buildProject('test-plugin-one', dryRun);
-    buildProject('plugin-template', dryRun);
-    buildProject('demo', dryRun);
 }
 
-async function runAllServers(dryRun = false) {
-    console.log('\n🖥️  Starting all development servers in parallel...');
-    const servers = ['demo', 'test-plugin-one', 'plugin-template'];
+async function buildOrStartServers(dryRun = false, isServer = false) {
+    const projects = ['demo', 'test-plugin-one', 'plugin-template'];
 
-    try {
-        await Promise.all(
-            servers.map((project) => spawnServer(project, dryRun))
-        );
-        console.log('\n✅ All development servers started successfully');
-    } catch (error) {
-        console.error('\n❌ Failed to start servers:', error);
-        process.exit(1);
+    if (isServer) {
+        // Start all servers in parallel
+        console.log('\n🚀 Starting development servers...');
+        try {
+            await Promise.all(
+                projects.map((project) =>
+                    runProjectCommand(project, 'start', dryRun, true)
+                )
+            );
+            console.log('\n✅ All development servers started successfully');
+        } catch (error) {
+            console.error('\n❌ Failed to start servers:', error);
+            process.exit(1);
+        }
+    } else {
+        // Run webpack builds sequentially
+        console.log('\n🏗️  Building webpack bundles...');
+        try {
+            for (const project of projects) {
+                await runProjectCommand(project, 'build', dryRun, false);
+            }
+            console.log('\n✅ All webpack builds completed successfully');
+        } catch (error) {
+            console.error('\n❌ Failed to build:', error);
+            process.exit(1);
+        }
     }
 }
 
 async function execute(options) {
-    const { dryRun, buildAndRun, runServers } = options;
+    const { dryRun, build, runServers } = options;
 
     if (dryRun) {
         console.log(
@@ -185,26 +216,33 @@ async function execute(options) {
         );
     }
 
-    if (!buildAndRun && !runServers) {
+    if (!build && !runServers) {
         console.log(
-            '❌ Error: Must specify either --build-and-run (-b) or --run-servers (-r)'
+            '❌ Error: Must specify either --build (-b) or --run-servers (-r)'
         );
         program.help();
         return;
     }
 
-    if (buildAndRun) {
-        await buildAllProjects(dryRun);
-        await runAllServers(dryRun);
-    } else if (runServers) {
-        await runAllServers(dryRun);
+    if (build) {
+        await buildFramework(dryRun);
+    }
+
+    if (runServers) {
+        // Start servers in parallel
+        await buildOrStartServers(dryRun, true);
+    } else if (!build) {
+        // Run webpack builds sequentially
+        await buildOrStartServers(dryRun, false);
     }
 
     if (dryRun) {
         console.log('\n📋 End of Dry Run - No commands were executed');
     } else {
         console.log('\n🎉 All operations completed successfully');
-        console.log('Press Ctrl+C to stop all development servers');
+        if (runServers) {
+            console.log('Press Ctrl+C to stop all development servers');
+        }
     }
 }
 
@@ -212,42 +250,33 @@ const description = `
 Development Build Script
 -----------------------
 This script manages the build process and development server execution for the Composaic project.
-It handles npm linking between packages and can build all projects and start their development servers,
-or just start the servers without building.
+It handles npm linking between packages and project builds.
 
-You must specify one of these options:
-- Build and run (-b): Builds all projects with proper linking and starts their development servers
-- Run servers only (-r): Starts development servers without building
-- Dry run (-d): Shows what commands would be executed without actually running them
+Required command line arguments:
+  -h, --help         Display this help message
+  -d, --dry-run      Dry run the script without executing any commands
+  -b, --build        Build the projects (npm install, link and build)
+  -r, --run-servers  Run the development servers
 
-Note: When using --dry-run (-d), you must also specify either --build-and-run (-b) or --run-servers (-r)
+If -r is specified:
+  - Starts development servers in parallel for demo, test-plugin-one, and plugin-template
+If -r is not specified:
+  - Runs webpack builds sequentially for demo, test-plugin-one, and plugin-template
+
+Note: When using --dry-run (-d), you must also specify either --build (-b) or --run-servers (-r)
 `;
 
 program
     .name('dev-build')
     .description(description)
     .option('-d, --dry-run', 'Show execution plan without making any changes')
-    .option(
-        '-b, --build-and-run',
-        'Build all projects and run development servers'
-    )
-    .option('-r, --run-servers', 'Run development servers without building');
+    .option('-b, --build', 'Build all projects with proper linking')
+    .option('-r, --run-servers', 'Run development servers');
 
 program.action((options) => {
-    const { dryRun, buildAndRun, runServers } = options;
-
-    // Only one main action should be specified
-    if (buildAndRun && runServers) {
-        console.log(
-            '\n❌ Error: Cannot specify both --build-and-run and --run-servers'
-        );
-        program.help();
-    }
-
     execute(options).catch((error) => {
         console.error('\n❌ Operation failed:', error);
         process.exit(1);
     });
 });
-
 program.parse();

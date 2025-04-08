@@ -1,13 +1,4 @@
-import {
-    Optional,
-    String,
-    Literal,
-    Array,
-    Record as RuntypeRecord,
-    Static,
-    Unknown,
-    Object,
-} from 'runtypes';
+import { z } from 'zod';
 
 export const LogCore = 'core';
 
@@ -54,53 +45,53 @@ export type Extension = {
     meta?: object;
 };
 
-export const PluginManifestExtensionPoints = Object({
-    id: String,
-    type: String,
-    singleton: Optional(Literal(true)),
+export const PluginManifestExtensionPoints = z.object({
+    id: z.string(),
+    type: z.string(),
+    singleton: z.literal(true).optional(),
 });
-export type PluginManifestExtensionPoints = Static<
+export type PluginManifestExtensionPoints = z.infer<
     typeof PluginManifestExtensionPoints
 >;
 
-export const PluginManifestExtension = Object({
-    plugin: String,
-    id: String,
-    className: String,
-    meta: Optional(Array(Unknown)),
+export const PluginManifestExtension = z.object({
+    plugin: z.string(),
+    id: z.string(),
+    className: z.string(),
+    meta: z.array(z.unknown()).optional(),
 });
-export type PluginManifestExtension = Static<typeof PluginManifestExtension>;
+export type PluginManifestExtension = z.infer<typeof PluginManifestExtension>;
 
-export const PluginManifestPluginDefinition = Object({
-    package: String,
-    module: String,
-    class: String,
-    plugin: String,
-    load: Optional(Literal('deferred')),
-    version: String,
-    description: String,
-    extensionPoints: Optional(Array(PluginManifestExtensionPoints)),
-    extensions: Optional(Array(PluginManifestExtension)),
+export const PluginManifestPluginDefinition = z.object({
+    package: z.string(),
+    module: z.string(),
+    class: z.string(),
+    plugin: z.string(),
+    load: z.literal('deferred').optional(),
+    version: z.string(),
+    description: z.string(),
+    extensionPoints: z.array(PluginManifestExtensionPoints).optional(),
+    extensions: z.array(PluginManifestExtension).optional(),
 });
-export type PluginManifestPluginDefinition = Static<
+export type PluginManifestPluginDefinition = z.infer<
     typeof PluginManifestPluginDefinition
 >;
 
-export const RemoteConfig = Object({
-    name: String,
-    bundleFile: String,
+export const RemoteConfig = z.object({
+    name: z.string(),
+    bundleFile: z.string(),
 });
 
-export const PluginManifestPlugin = Object({
+export const PluginManifestPlugin = z.object({
     remote: RemoteConfig,
-    definitions: Array(PluginManifestPluginDefinition),
+    definitions: z.array(PluginManifestPluginDefinition),
 });
-export type PluginManifestPlugin = Static<typeof PluginManifestPlugin>;
+export type PluginManifestPlugin = z.infer<typeof PluginManifestPlugin>;
 
-export const PluginManifest = Object({
-    plugins: Array(PluginManifestPlugin),
+export const PluginManifest = z.object({
+    plugins: z.array(PluginManifestPlugin),
 });
-export type PluginManifest = Static<typeof PluginManifest>;
+export type PluginManifest = z.infer<typeof PluginManifest>;
 
 export abstract class Plugin {
     initialised = false;
