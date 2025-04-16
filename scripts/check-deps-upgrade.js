@@ -1,5 +1,31 @@
 #!/usr/bin/env node
 
+/**
+ * Dependency Upgrade Validation Script
+ *
+ * This script validates dependency upgrades across interdependent projects in the Composaic monorepo.
+ * It ensures that when dependencies are updated in one project, all dependent projects continue to
+ * build and test successfully.
+ *
+ * Key features:
+ * - Checks out a specified branch containing dependency updates
+ * - Installs and builds the target project with updated dependencies
+ * - Runs tests to verify changes don't break functionality
+ * - Automatically links local dependencies between projects
+ * - Validates all dependent projects to ensure compatibility
+ * - Supports dry-run mode to preview changes
+ *
+ * Usage examples:
+ *   Check core project updates:
+ *   $ node check-deps-upgrade.js -p core -b feat/update-dependencies
+ *
+ *   Dry run for web project:
+ *   $ node check-deps-upgrade.js -p web -b feat/upgrade-react -d
+ *
+ *   Verbose check for demo project:
+ *   $ node check-deps-upgrade.js -p demo -b feat/new-deps -v
+ */
+
 const { program } = require('commander');
 const { execSync } = require('child_process');
 const path = require('path');
