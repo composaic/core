@@ -83,6 +83,6 @@
         "express": "^5.1.0",
         "mitt": "^3.0.1",
         "reflect-metadata": "^0.2.2",
-        "runtypes": "^7.0.4"
+        "zod": "^3.24.2"
     }
 }
