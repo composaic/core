@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.15.0 (24 May 2025)
+
+o Build improvements
+o Deps upgrade
+
 ## 0.14.0 (4 Mar 2025)
 
 o Fixed path handling and some other failing tests
