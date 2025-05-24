@@ -28,7 +28,7 @@ export type RemoteModuleLoaderFn = (
 export type PluginModule = {
     getPluginDefinitions: () => PluginDescriptor[];
     getModuleName: () => string;
-}
+};
 
 interface InitOptions {
     getPluginModules?: () => PluginModule[];
@@ -44,25 +44,30 @@ export const init = async (options: InitOptions) => {
         module: LogCore,
         message: 'Logging service initialised.',
     });
-    const {
-        getPluginModules,
-        addLocalPlugins,
-        config,
-        loadRemoteModule,
-    } = options;
+    const { getPluginModules, addLocalPlugins, config, loadRemoteModule } =
+        options;
     RemoteModuleLoaderService.initialiseStaticInstance(loadRemoteModule);
     const systemPlugins = getSystemPluginDefinitions();
     await PluginManager.getInstance().addPluginDefinitions(systemPlugins);
-    
+
     if (getPluginModules) {
-        getPluginModules().map(async (pluginModule) => {
-            console.log(`[composaic] Adding plugin module ${pluginModule.getModuleName()}`);
-            const definitions = pluginModule.getPluginDefinitions();
-            console.log(`[composaic] Plugin definitions:`, JSON.stringify(definitions, null, 2));
-            await PluginManager.getInstance().addPluginDefinitions(definitions);
-        });
+        await Promise.all(
+            getPluginModules().map(async (pluginModule) => {
+                console.log(
+                    `[composaic] Adding plugin module ${pluginModule.getModuleName()}`
+                );
+                const definitions = pluginModule.getPluginDefinitions();
+                console.log(
+                    `[composaic] Plugin definitions:`,
+                    JSON.stringify(definitions, null, 2)
+                );
+                await PluginManager.getInstance().addPluginDefinitions(
+                    definitions
+                );
+            })
+        );
     }
-    
+
     await LoggingService.createInstance(true);
     await addLocalPlugins?.();
     const configuration =
@@ -72,7 +77,10 @@ export const init = async (options: InitOptions) => {
         message: `Configuration ${JSON.stringify(configuration)}`,
     });
 
-    RemotePluginLoader.getInstance().loadManifests(configuration.remotes);
+    // Await remote manifest loading to ensure all plugins are registered
+    console.log('[composaic] Loading remote plugin manifests...');
+    await RemotePluginLoader.getInstance().loadManifests(configuration.remotes);
+    console.log('[composaic] Remote plugin manifests loaded');
 
     // Create and initialize services
     createServices();

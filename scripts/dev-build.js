@@ -53,14 +53,17 @@ const PROJECTS = {
     'test-plugin-one': {
         path: 'demo/applications/test-plugin-one',
         dependencies: ['@composaic/core', '@composaic/web'],
+        buildCommand: 'build', // Added buildCommand
     },
     'plugin-template': {
         path: 'demo/applications/plugin-template',
         dependencies: ['@composaic/core', '@composaic/web'],
+        buildCommand: 'build', // Added buildCommand
     },
     demo: {
         path: 'demo',
         dependencies: ['@composaic/core', '@composaic/web'],
+        buildCommand: 'build', // Added buildCommand
     },
 };
 
@@ -169,10 +172,19 @@ function runProjectCommand(project, command, dryRun, isServer = true) {
 }
 
 async function buildFramework(dryRun = false) {
-    // Build only core and web projects
-    console.log('\n📦 Building core projects...');
+    // Build and link core first
+    console.log('\n📦 Building core project...');
     buildProject('core', dryRun);
+
+    // Build and link web next
+    console.log('\n📦 Building web project...');
     buildProject('web', dryRun);
+
+    // Build demo projects with proper linking
+    console.log('\n📦 Building demo projects...');
+    buildProject('test-plugin-one', dryRun);
+    buildProject('plugin-template', dryRun);
+    buildProject('demo', dryRun);
 }
 
 async function buildOrStartServers(dryRun = false, isServer = false) {
