@@ -53,6 +53,33 @@ check_uncommitted_changes() {
     return 0
 }
 
+# Switch to main branch and update it
+update_main_branch() {
+    local current_branch=$(git rev-parse --abbrev-ref HEAD)
+    
+    # First fetch all changes
+    log "⬇️" "Fetching latest changes"
+    if ! execute "git fetch origin"; then
+        return 1
+    fi
+    
+    # Switch to main
+    log "🔄" "Switching to main branch"
+    if ! execute "git checkout main"; then
+        log "❌" "Failed to switch to main branch"
+        return 1
+    fi
+    
+    # Update main
+    log "⬆️" "Updating main branch"
+    if ! execute "git reset --hard origin/main"; then
+        log "❌" "Failed to update main branch"
+        return 1
+    fi
+    
+    return 0
+}
+
 # Get list of merged branches
 get_merged_branches() {
     git branch --merged main | grep -vE '^\*|main$' || true
@@ -124,9 +151,12 @@ for project in "${PROJECTS[@]}"; do
         continue
     fi
     
-    # Update remote tracking info
-    log "⬇️" "Fetching latest remote information"
-    execute "git fetch --prune" || { ((SKIPPED_PROJECTS++)); continue; }
+    # Switch to and update main branch
+    if ! update_main_branch; then
+        log "❌" "Failed to update main branch in $project"
+        ((SKIPPED_PROJECTS++))
+        continue
+    fi
     
     # Check for merged branches
     log "🔍" "Checking for merged branches..."
