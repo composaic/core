@@ -22,6 +22,8 @@ show_help() {
     echo "    1. Local branches that have been merged into main"
     echo "    2. Local branches whose remote tracking branch is gone"
     echo
+    log "⚠️" "Note: The script will not run if there are uncommitted changes"
+    echo
     exit 0
 }
 
@@ -30,10 +32,25 @@ execute() {
     local command=$1
     if [ "$DRY_RUN" = true ]; then
         log "🔍" "Would execute: $command"
+        return 0
     else
         eval "$command"
         return $?
     fi
+}
+
+# Check for uncommitted changes
+check_uncommitted_changes() {
+    if [ "$DRY_RUN" = true ]; then
+        return 0
+    fi
+    
+    if ! git diff --quiet HEAD; then
+        log "❌" "Uncommitted changes detected in $(basename $(pwd))"
+        log "💡" "Please commit or stash your changes first"
+        return 1
+    fi
+    return 0
 }
 
 # Get list of merged branches
@@ -55,13 +72,11 @@ SKIPPED_PROJECTS=0
 # Parse arguments
 DRY_RUN=false
 
-# Show help if no arguments or --help
-if [ $# -eq 0 ] || [ "$1" = "--help" ]; then
-    show_help
-fi
-
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --help)
+            show_help
+            ;;
         --dry-run)
             DRY_RUN=true
             shift
@@ -102,6 +117,12 @@ for project in "${PROJECTS[@]}"; do
     
     log "🔄" "Checking project: $project"
     execute "cd \"$PROJECT_PATH\"" || { ((SKIPPED_PROJECTS++)); continue; }
+    
+    # Check for uncommitted changes
+    if ! check_uncommitted_changes; then
+        ((SKIPPED_PROJECTS++))
+        continue
+    fi
     
     # Update remote tracking info
     log "⬇️" "Fetching latest remote information"
@@ -152,5 +173,9 @@ echo "  Total branches to clean: $((TOTAL_MERGED + TOTAL_GONE))"
 if [ "$DRY_RUN" = true ]; then
     log "🎭" "Dry run completed - no branches were deleted"
 else
-    log "🎉" "Branch cleanup completed"
+    if [ $((TOTAL_MERGED + TOTAL_GONE)) -eq 0 ]; then
+        log "✨" "No branches needed cleaning"
+    else
+        log "🎉" "Successfully cleaned up $((TOTAL_MERGED + TOTAL_GONE)) branch(es)"
+    fi
 fi
