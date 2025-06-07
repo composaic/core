@@ -25,14 +25,17 @@ show_help() {
     exit 0
 }
 
-# Execute or simulate command based on dry run mode
+# Execute command depending on whether it's read-only or state-changing
 execute() {
     local command=$1
-    if [ "$DRY_RUN" = true ]; then
-        log "🔍" "Would execute: $command"
-    else
+    local read_only=${2:-false}
+
+    # Always execute read-only commands, even in dry run mode
+    if [ "$read_only" = true ] || [ "$DRY_RUN" = false ]; then
         eval "$command"
         return $?
+    else
+        log "🔍" "Would execute: $command"
     fi
 }
 
@@ -91,26 +94,46 @@ for project in "${PROJECTS[@]}"; do
     fi
     
     log "🔄" "Switching to project: $project"
-    execute "cd \"$PROJECT_PATH\"" || continue
+    # Directory changes must always execute for git commands to work
+    cd "$PROJECT_PATH" || {
+        log "❌" "Failed to switch to directory: $PROJECT_PATH"
+        continue
+    }
     
-    # Check for uncommitted changes
-    if ! execute "git diff --quiet && git diff --cached --quiet"; then
+    # Check for uncommitted changes (read-only operation)
+    if ! execute "git diff --quiet && git diff --cached --quiet" true; then
         log "❌" "Uncommitted changes detected in $project. Please commit or stash them first."
         continue
     fi
     
-    # Fetch latest changes from main
+    # Fetch latest changes from main (network operation but doesn't change state)
     log "⬇️" "Fetching latest changes from main"
-    execute "git fetch origin main" || continue
+    execute "git fetch origin main" true || continue
     
-    # Switch to main and reset to origin/main
-    log "🔄" "Updating main branch"
-    execute "git checkout main" || continue
-    execute "git reset --hard origin/main" || continue
+    # Get current branch (read-only operation)
+    CURRENT_BRANCH=$(execute "git rev-parse --abbrev-ref HEAD" true)
     
-    # Create and switch to new branch
-    log "🌱" "Creating new branch: $BRANCH_NAME"
-    execute "git checkout -b \"$BRANCH_NAME\"" || continue
+    # Switch to main and reset to origin/main if needed
+    if [ "$CURRENT_BRANCH" != "main" ]; then
+        log "🔄" "Updating main branch"
+        execute "git checkout main" || continue
+        execute "git reset --hard origin/main" || continue
+    fi
+    
+    # Check if we're already on the target branch
+    if [ "$CURRENT_BRANCH" = "$BRANCH_NAME" ]; then
+        log "✓" "Already on branch '$BRANCH_NAME' in $project"
+        continue
+    fi
+
+    # Check if branch exists (read-only operation)
+    if execute "git show-ref --verify --quiet refs/heads/$BRANCH_NAME" true; then
+        log "🔄" "Switching to existing branch: $BRANCH_NAME"
+        execute "git checkout \"$BRANCH_NAME\"" || continue
+    else
+        log "🌱" "Creating new branch: $BRANCH_NAME"
+        execute "git checkout -b \"$BRANCH_NAME\"" || continue
+    fi
     
     log "✅" "Successfully set up branch in $project"
     echo
