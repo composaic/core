@@ -1,30 +1,5 @@
 #!/usr/bin/env node
 
-/**
- * Instructions for AI
- * 1. look at the check-deps-upgrade.js file for
- *   - use of commander library for command line arguments
- *   - use of path to execute commands
- * 2. required command line arguments
- *  -h --help display bried description and list the options with explanation (pretty print)
- *  -d --dry-run dry run the script without executing any commands
- *  -b --build build the projects
- *  -r --run-servers run the servers
- * If no option specified default to -h explaining that to run the script you either need to specify -d or -b
- * 2. Steps
- *   - if -b --build is specified
- *      - [core]: npm i, npm run build, then npm link
- *      - [web]: npm i, npm link @composaic/core, then npm run build, finally npm link
- *      - [test-plugin-one]: npm i, npm link @composaic/core, @composaic/web
- *      - [plugin-template]: npm i, npm link @composaic/core, @composaic/web
- *      - [demo]: npm i, npm link @composaic/core, @composaic/web
- *   - end-if
- *   - if -r
- *      - npm run start in [demo], [test-plugin-one], [plugin-template] (start all servers in parallel)
- *   - else
- *      - npm run build in [demo], [test-plugin-one], [plugin-template] (you can run these 3 commands sequentially)
- */
-
 const { program } = require('commander');
 const { execSync, spawn } = require('child_process');
 const path = require('path');
@@ -42,28 +17,46 @@ const PROJECTS = {
     core: {
         path: 'core',
         needsLink: true,
-        buildCommand: 'build',
+        buildCommand: 'build', // Core is a library, no dev/prod distinction needed
     },
     web: {
         path: 'web',
         dependencies: ['@composaic/core'],
         needsLink: true,
-        buildCommand: 'build',
+        buildCommand: {
+            development: 'build:dev', // Web project has specific dev/prod builds
+            production: 'build',
+        },
     },
     'test-plugin-one': {
         path: 'demo/applications/test-plugin-one',
         dependencies: ['@composaic/core', '@composaic/web'],
-        buildCommand: 'build', // Added buildCommand
+        buildCommand: {
+            development:
+                'clean && build:manifests && npx webpack --progress --mode development',
+            production: 'build', // Uses default production mode
+        },
+        serverCommand: 'start',
     },
     'plugin-template': {
         path: 'demo/applications/plugin-template',
         dependencies: ['@composaic/core', '@composaic/web'],
-        buildCommand: 'build', // Added buildCommand
+        buildCommand: {
+            development:
+                'clean && build:manifests && npx webpack --progress --mode development',
+            production: 'build',
+        },
+        serverCommand: 'start',
     },
     demo: {
         path: 'demo',
         dependencies: ['@composaic/core', '@composaic/web'],
-        buildCommand: 'build', // Added buildCommand
+        buildCommand: {
+            development:
+                'clean && build:manifests && npx webpack --progress --mode development',
+            production: 'build',
+        },
+        serverCommand: 'start',
     },
 };
 
@@ -92,7 +85,7 @@ function execCommand(command, projectPath, dryRun = false) {
     }
 }
 
-function buildProject(project, dryRun) {
+function buildProject(project, mode, dryRun) {
     const config = PROJECTS[project];
     console.log(`\n🔨 Setting up ${project}...`);
 
@@ -109,8 +102,32 @@ function buildProject(project, dryRun) {
 
     // Build if needed
     if (config.buildCommand) {
-        console.log(`\n🏗️  Building ${project}...`);
-        execCommand(`npm run ${config.buildCommand}`, config.path, dryRun);
+        console.log(
+            `\n🏗️  Building ${project}${project !== 'core' ? ` in ${mode} mode` : ''}...`
+        );
+
+        // Get the appropriate build command
+        const cmd =
+            typeof config.buildCommand === 'string'
+                ? config.buildCommand
+                : config.buildCommand[mode] || config.buildCommand.production;
+
+        // For commands with multiple steps, split and handle each appropriately
+        const buildCmd = cmd.includes('&&')
+            ? cmd
+                  .split('&&')
+                  .map((part) => {
+                      const trimmed = part.trim();
+                      // Keep npx webpack commands as is, prefix others with npm run
+                      return trimmed.startsWith('npx webpack') ||
+                          trimmed.startsWith('webpack')
+                          ? trimmed
+                          : `npm run ${trimmed}`;
+                  })
+                  .join(' && ')
+            : `npm run ${cmd}`;
+
+        execCommand(buildCmd, config.path, dryRun);
     }
 
     // Make available for linking if needed
@@ -120,21 +137,72 @@ function buildProject(project, dryRun) {
     }
 }
 
-function runProjectCommand(project, command, dryRun, isServer = true) {
-    return new Promise((resolve, reject) => {
-        const targetDir = getProjectPath(PROJECTS[project].path);
-        console.log(
-            `\n${isServer ? '🚀 Starting development server' : '🏗️  Building webpack bundle'} for ${project}...`
-        );
-        console.log(`\n🔧 Executing: npm run ${command} in ${targetDir}`);
+function rebuildManifests(dryRun = false, watchMode = false) {
+    const mode = watchMode ? 'watch' : 'build';
+    const command = watchMode ? 'dev:manifests' : 'build:manifests -- --force';
 
-        if (dryRun) {
-            console.log(`Would execute: npm run ${command} in ${targetDir}`);
+    console.log(
+        `\n🔄 ${watchMode ? 'Starting manifest watchers' : 'Rebuilding manifests'} for application plugins...`
+    );
+
+    // Get application plugins (those with serverCommand)
+    const applicationPlugins = Object.keys(PROJECTS).filter(
+        (project) => PROJECTS[project].serverCommand
+    );
+
+    applicationPlugins.forEach((project) => {
+        console.log(
+            `\n📝 ${watchMode ? 'Starting manifest watcher' : 'Rebuilding manifest'} for ${project}...`
+        );
+        execCommand(`npm run ${command}`, PROJECTS[project].path, dryRun);
+    });
+
+    console.log(`\n✅ Manifest ${mode} completed`);
+}
+
+function initialManifestBuild(dryRun = false) {
+    console.log('\n🏗️  Building initial manifests before starting watchers...');
+
+    // Get application plugins (those with serverCommand)
+    const applicationPlugins = Object.keys(PROJECTS).filter(
+        (project) => PROJECTS[project].serverCommand
+    );
+
+    applicationPlugins.forEach((project) => {
+        console.log(`\n📝 Building initial manifest for ${project}...`);
+        execCommand('npm run build:manifests', PROJECTS[project].path, dryRun);
+    });
+
+    console.log('\n✅ Initial manifest build completed');
+}
+
+function startServer(project, dryRun) {
+    return new Promise((resolve, reject) => {
+        const config = PROJECTS[project];
+        const targetDir = getProjectPath(config.path);
+
+        if (!config.serverCommand) {
+            console.log(
+                `\n⚠️ Project ${project} does not have a server command`
+            );
             resolve();
             return;
         }
 
-        const child = spawn('npm', ['run', command], {
+        console.log(`\n🚀 Starting development server for ${project}...`);
+        console.log(
+            `\n🔧 Executing: npm run ${config.serverCommand} in ${targetDir}`
+        );
+
+        if (dryRun) {
+            console.log(
+                `Would execute: npm run ${config.serverCommand} in ${targetDir}`
+            );
+            resolve();
+            return;
+        }
+
+        const child = spawn('npm', ['run', config.serverCommand], {
             cwd: targetDir,
             stdio: 'inherit',
             shell: true,
@@ -142,85 +210,64 @@ function runProjectCommand(project, command, dryRun, isServer = true) {
         });
 
         child.on('error', (error) => {
-            console.error(
-                `\n❌ Error ${isServer ? 'starting server' : 'building'} for ${project}:`,
-                error
-            );
+            console.error(`\n❌ Error starting server for ${project}:`, error);
             reject(error);
         });
 
         child.on('exit', (code) => {
             if (code !== 0 && code !== null) {
                 console.error(
-                    `\n❌ ${isServer ? 'Server' : 'Build'} for ${project} exited with code ${code}`
+                    `\n❌ Server for ${project} exited with code ${code}`
                 );
-                reject(
-                    new Error(
-                        `${isServer ? 'Server' : 'Build'} ${project} failed with code ${code}`
-                    )
-                );
+                reject(new Error(`Server ${project} failed with code ${code}`));
             } else {
-                if (!isServer) {
-                    resolve(); // For builds, resolve immediately
-                } else {
-                    // For servers, resolve after a delay to allow startup
-                    setTimeout(() => resolve(child), 1000);
-                }
+                resolve();
             }
         });
     });
 }
 
-async function buildFramework(dryRun = false) {
+async function buildFramework(mode, dryRun = false) {
     // Build and link core first
     console.log('\n📦 Building core project...');
-    buildProject('core', dryRun);
+    buildProject('core', mode, dryRun);
 
     // Build and link web next
-    console.log('\n📦 Building web project...');
-    buildProject('web', dryRun);
+    console.log(`\n📦 Building web project in ${mode} mode...`);
+    buildProject('web', mode, dryRun);
 
     // Build demo projects with proper linking
-    console.log('\n📦 Building demo projects...');
-    buildProject('test-plugin-one', dryRun);
-    buildProject('plugin-template', dryRun);
-    buildProject('demo', dryRun);
+    console.log(`\n📦 Building demo projects in ${mode} mode...`);
+    buildProject('test-plugin-one', mode, dryRun);
+    buildProject('plugin-template', mode, dryRun);
+    buildProject('demo', mode, dryRun);
 }
 
-async function buildOrStartServers(dryRun = false, isServer = false) {
+async function startServers(dryRun = false) {
     const projects = ['demo', 'test-plugin-one', 'plugin-template'];
 
-    if (isServer) {
-        // Start all servers in parallel
-        console.log('\n🚀 Starting development servers...');
-        try {
-            await Promise.all(
-                projects.map((project) =>
-                    runProjectCommand(project, 'start', dryRun, true)
-                )
-            );
-            console.log('\n✅ All development servers started successfully');
-        } catch (error) {
-            console.error('\n❌ Failed to start servers:', error);
-            process.exit(1);
-        }
-    } else {
-        // Run webpack builds sequentially
-        console.log('\n🏗️  Building webpack bundles...');
-        try {
-            for (const project of projects) {
-                await runProjectCommand(project, 'build', dryRun, false);
-            }
-            console.log('\n✅ All webpack builds completed successfully');
-        } catch (error) {
-            console.error('\n❌ Failed to build:', error);
-            process.exit(1);
-        }
+    console.log('\n🚀 Starting development servers...');
+
+    // Build initial manifests before starting servers
+    initialManifestBuild(dryRun);
+
+    console.log(
+        '📝 Note: Manifest watchers will be started automatically by each server'
+    );
+
+    try {
+        await Promise.all(
+            projects.map((project) => startServer(project, dryRun))
+        );
+        console.log('\n✅ All development servers started successfully');
+    } catch (error) {
+        console.error('\n❌ Failed to start servers:', error);
+        process.exit(1);
     }
 }
 
 async function execute(options) {
-    const { dryRun, build, runServers } = options;
+    const { dryRun, build, runServers, mode } = options;
 
     if (dryRun) {
         console.log(
@@ -230,31 +277,31 @@ async function execute(options) {
 
     if (!build && !runServers) {
         console.log(
-            '❌ Error: Must specify either --build (-b) or --run-servers (-r)'
+            '❌ Error: Must specify either --build (-b) or --run-servers (-r) or both'
         );
         program.help();
         return;
     }
 
     if (build) {
-        await buildFramework(dryRun);
+        console.log(`\n🔧 Building projects in ${mode} mode`);
+        await buildFramework(mode, dryRun);
+
+        // If only building (not running servers), do one-time manifest generation
+        if (!runServers) {
+            rebuildManifests(dryRun, false); // false = build mode (one-time)
+        }
     }
 
     if (runServers) {
-        // Start servers in parallel
-        await buildOrStartServers(dryRun, true);
-    } else if (!build) {
-        // Run webpack builds sequentially
-        await buildOrStartServers(dryRun, false);
+        // When running servers, always use watch mode for manifests
+        // Never skip manifest setup when running servers - we always want watchers
+        await startServers(dryRun, false); // false = don't skip manifest setup
+        console.log('Press Ctrl+C to stop all development servers');
     }
 
-    if (dryRun) {
-        console.log('\n📋 End of Dry Run - No commands were executed');
-    } else {
-        console.log('\n🎉 All operations completed successfully');
-        if (runServers) {
-            console.log('Press Ctrl+C to stop all development servers');
-        }
+    if (!runServers) {
+        console.log('\n🎉 All build operations completed successfully');
     }
 }
 
@@ -268,14 +315,25 @@ Required command line arguments:
   -h, --help         Display this help message
   -d, --dry-run      Dry run the script without executing any commands
   -b, --build        Build the projects (npm install, link and build)
-  -r, --run-servers  Run the development servers
+  -r, --run-servers  Run the development servers (starts manifest watchers)
+  -m, --mode <mode>  Specify build mode for web projects (development or production)
+                     Core builds use standard library build regardless of mode
 
-If -r is specified:
-  - Starts development servers in parallel for demo, test-plugin-one, and plugin-template
-If -r is not specified:
-  - Runs webpack builds sequentially for demo, test-plugin-one, and plugin-template
+Examples:
+  Build all projects in development mode:
+    dev-build -b
 
-Note: When using --dry-run (-d), you must also specify either --build (-b) or --run-servers (-r)
+  Build in production mode:
+    dev-build -b -m production
+
+  Start development servers (starts manifest watchers):
+    dev-build -r
+
+  Build and start servers (builds once, then starts watchers):
+    dev-build -b -r
+
+Note: When using --dry-run (-d), you must also specify either --build (-b) or --run-servers (-r) or both
+Note: -b uses build:manifests (one-time), -r uses dev:manifests (watch mode), -b -r uses dev:manifests
 `;
 
 program
@@ -283,7 +341,12 @@ program
     .description(description)
     .option('-d, --dry-run', 'Show execution plan without making any changes')
     .option('-b, --build', 'Build all projects with proper linking')
-    .option('-r, --run-servers', 'Run development servers');
+    .option('-r, --run-servers', 'Run development servers')
+    .option(
+        '-m, --mode <mode>',
+        'Specify build mode (development or production)',
+        'development'
+    );
 
 program.action((options) => {
     execute(options).catch((error) => {
@@ -291,4 +354,5 @@ program.action((options) => {
         process.exit(1);
     });
 });
+
 program.parse();

@@ -275,18 +275,50 @@ const watchCommand = new Command('watch')
         const configDir = path.dirname(
             path.resolve(process.cwd(), options.config)
         );
-        const patterns = (config.optimization?.watchMode?.patterns || []).map(
-            (pattern) => path.join(configDir, pattern)
-        );
+        // Get watch directory and patterns from config
+        const watchMode = config.optimization?.watchMode as any;
+        const watchDir = watchMode?.directory || 'dist/';
+        const watchPath = path.join(configDir, watchDir);
+        const patterns = watchMode?.patterns || ['src_plugins_*.js'];
+
+        // Pattern matching function
+        const minimatch = require('minimatch');
+        const matchesAnyPattern = (filePath: string): boolean => {
+            const fileName = path.basename(filePath);
+            return patterns.some((pattern: string) =>
+                minimatch(fileName, pattern)
+            );
+        };
+
         const debounceMs = config.optimization?.watchMode?.debounceMs || 100;
 
-        console.log(`Watching for changes in ${configDir}...`);
-        console.log(`Patterns: ${patterns.join(', ')}`);
+        console.log(`Watching directory: ${watchPath}`);
+        console.log(`File patterns: ${patterns.join(', ')}`);
+
+        // Debug: Check if watch directory exists and show current matching files
+        const fs = require('fs');
+        if (fs.existsSync(watchPath)) {
+            const files = fs.readdirSync(watchPath);
+            const matchingFiles = files.filter((file: string) =>
+                matchesAnyPattern(path.join(watchPath, file))
+            );
+            console.log(
+                `Found ${matchingFiles.length} matching files: ${matchingFiles.join(', ')}`
+            );
+        } else {
+            console.log(`Watch directory does not exist: ${watchPath}`);
+        }
 
         const chokidar = require('chokidar');
-        const watcher = chokidar.watch(patterns, {
+        const watcher = chokidar.watch(watchPath, {
             persistent: true,
             ignoreInitial: true,
+            usePolling: false, // Use native file system events
+            awaitWriteFinish: {
+                stabilityThreshold: 100,
+                pollInterval: 50,
+            },
+            atomic: true, // Handle atomic writes (like webpack does)
         });
 
         let timeoutId: NodeJS.Timeout | null = null;
@@ -308,19 +340,34 @@ const watchCommand = new Command('watch')
             }, debounceMs);
         };
 
-        watcher.on('change', (path: string) => {
-            console.log(`File ${path} has been changed`);
-            debouncedGenerate();
+        // Add debugging and error handling
+        watcher.on('ready', () => {
+            console.log('Watcher is ready and watching for changes...');
         });
 
-        watcher.on('add', (path: string) => {
-            console.log(`File ${path} has been added`);
-            debouncedGenerate();
+        watcher.on('error', (error: Error) => {
+            console.error('Watcher error:', error);
         });
 
-        watcher.on('unlink', (path: string) => {
-            console.log(`File ${path} has been removed`);
-            debouncedGenerate();
+        watcher.on('change', (filePath: string) => {
+            if (matchesAnyPattern(filePath)) {
+                console.log(`File ${filePath} has been changed`);
+                debouncedGenerate();
+            }
+        });
+
+        watcher.on('add', (filePath: string) => {
+            if (matchesAnyPattern(filePath)) {
+                console.log(`File ${filePath} has been added`);
+                debouncedGenerate();
+            }
+        });
+
+        watcher.on('unlink', (filePath: string) => {
+            if (matchesAnyPattern(filePath)) {
+                console.log(`File ${filePath} has been removed`);
+                debouncedGenerate();
+            }
         });
 
         process.on('SIGINT', () => {
