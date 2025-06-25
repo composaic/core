@@ -225,41 +225,64 @@ export class PluginManager {
 
         // load plugins that this plugin depends on
         if (pluginDescriptor.dependencies) {
-            for (const dependency of pluginDescriptor.dependencies) {
-                const pluginToLoad = (dependency as PluginDescriptor).plugin;
-                if (pluginToLoad === dependingPlugin) {
-                    continue;
+            const dependencyPromises = pluginDescriptor.dependencies.map(
+                (dependency: PluginDescriptor) => {
+                    const pluginToLoad = (dependency as PluginDescriptor)
+                        .plugin;
+                    if (pluginToLoad === dependingPlugin) {
+                        return Promise.resolve(); // Skip self-dependency
+                    }
+
+                    // check if target plugin is available in the registry
+                    // it might not have been added yet if it is a remote plugin
+                    if (!this.registry[pluginToLoad]) {
+                        LoggingService.getInstance().info({
+                            module: pluginModule,
+                            header: pluginName,
+                            message: `Dependency with ID ${pluginToLoad} not found in registry, delaying loading of plugin ${pluginName}`,
+                        });
+                        // remember that for the target plugin we are going to have to reload this plugin once again
+                        // we might be able to do this in a more efficient way by only setting the extensions (which are already loaded)
+                        // for the target plugin when that has become available
+                        // reason for this is that even if none of the dependencies are available, this plugin will still keeps loading and
+                        // it's extensions will be initialised and ready for use
+                        if (!this.awaitingDependency[pluginToLoad]) {
+                            this.awaitingDependency[pluginToLoad] = [];
+                        }
+                        this.awaitingDependency[pluginToLoad].push(
+                            pluginDescriptor.plugin
+                        );
+                        return Promise.reject(
+                            new Error(
+                                `Dependency ${pluginToLoad} not found in registry`
+                            )
+                        );
+                    } else {
+                        return this.loadPlugin(
+                            (dependency as PluginDescriptor).plugin,
+                            {
+                                dependingPlugin: pluginDescriptor.plugin,
+                                processManifestOnly,
+                            }
+                        );
+                    }
                 }
-                // check if target plugin is available in the registry
-                // it might not have been added yet if it is a remote plugin
-                if (!this.registry[pluginToLoad]) {
+            );
+
+            const results = await Promise.allSettled(dependencyPromises);
+            // Log any failed dependencies but continue with plugin loading
+            results.forEach((result, index) => {
+                if (result.status === 'rejected') {
+                    const dependency = pluginDescriptor.dependencies![
+                        index
+                    ] as PluginDescriptor;
                     LoggingService.getInstance().info({
                         module: pluginModule,
                         header: pluginName,
-                        message: `Dependency with ID ${pluginToLoad} not found in registry, delaying loading of plugin ${pluginName}`,
+                        message: `Failed to load dependency ${dependency.plugin}: ${result.reason}`,
                     });
-                    // remember that for the target plugin we are going to have to reload this plugin once again
-                    // we might be able to do this in a more efficient way by only setting the extensions (which are already loaded)
-                    // for the target plugin when that has become available
-                    // reason for this is that even if none of the dependencies are available, this plugin will still keeps loading and
-                    // it's extensions will be initialised and ready for use
-                    if (!this.awaitingDependency[pluginToLoad]) {
-                        this.awaitingDependency[pluginToLoad] = [];
-                    }
-                    this.awaitingDependency[pluginToLoad].push(
-                        pluginDescriptor.plugin
-                    );
-                    continue;
-                } else {
-                    await this.loadPlugin(
-                        (dependency as PluginDescriptor).plugin,
-                        {
-                            dependingPlugin: pluginDescriptor.plugin,
-                            processManifestOnly,
-                        }
-                    );
                 }
-            }
+            });
         }
         if (deferred) {
             LoggingService.getInstance().info({
@@ -330,6 +353,7 @@ export class PluginManager {
                     if (!extensionPoint!.impl) {
                         extensionPoint!.impl = [];
                     }
+
                     // Find and replace or add new extension
                     const existingIndex: number =
                         extensionPoint.impl!.findIndex(
@@ -360,9 +384,21 @@ export class PluginManager {
                         setTimeout(() => {
                             // need to restart the plugin so it picks up stuff from new extension!
                             if (this.registry[extension.plugin]) {
-                                this.registry[
-                                    extension.plugin
-                                ].pluginInstance?.start();
+                                const targetPluginDescriptor =
+                                    this.registry[extension.plugin];
+
+                                // FIRST: Refresh extension connections with updated data
+                                targetPluginDescriptor.extensionPoints?.forEach(
+                                    (extensionPoint: ExtensionPoint) => {
+                                        targetPluginDescriptor.pluginInstance.connectExtensions(
+                                            extensionPoint.id,
+                                            extensionPoint.impl!
+                                        );
+                                    }
+                                );
+
+                                // THEN: Restart the plugin
+                                targetPluginDescriptor.pluginInstance?.start();
                             }
                             LoggingService.getInstance().info({
                                 module: pluginModule,
