@@ -1,5 +1,5 @@
 const sass = require('sass');
-const glob = require('glob');
+const { glob } = require('glob');
 const fs = require('fs');
 const path = require('path');
 
@@ -33,14 +33,22 @@ function compileSass(filePath, srcFolder, targetFolder) {
 }
 
 // Find all SCSS files in the project within the source folder
-glob(`${srcFolder}/**/*.scss`, (err, files) => {
-    if (err) {
-        console.error('Error finding SCSS files:', err);
-        return;
-    }
+async function compileAllScss() {
+    try {
+        const files = await glob(`${srcFolder}/**/*.scss`);
 
-    files.forEach((file) => {
-        compileSass(file, srcFolder, path.join(targetFolder, 'cjs'));
-        compileSass(file, srcFolder, path.join(targetFolder, 'esm'));
-    });
-});
+        if (files.length === 0) {
+            console.log('No SCSS files found.');
+            return;
+        }
+
+        files.forEach((file) => {
+            compileSass(file, srcFolder, path.join(targetFolder, 'cjs'));
+            compileSass(file, srcFolder, path.join(targetFolder, 'esm'));
+        });
+    } catch (err) {
+        console.error('Error finding SCSS files:', err);
+    }
+}
+
+compileAllScss();
