@@ -57,9 +57,9 @@ check_uncommitted_changes() {
 update_main_branch() {
     local current_branch=$(git rev-parse --abbrev-ref HEAD)
     
-    # First fetch all changes
-    log "⬇️" "Fetching latest changes"
-    if ! execute "git fetch origin"; then
+    # First fetch all changes and prune stale remote references
+    log "⬇️" "Fetching latest changes and pruning stale references"
+    if ! execute "git fetch origin --prune"; then
         return 1
     fi
     
