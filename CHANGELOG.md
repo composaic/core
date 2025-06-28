@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.16.0 (28 Jun 2025)
+
+o Multiple extension per plugin support
+o Plugin manifest improvements (local app plugins)
+
 ## 0.15.0 (24 May 2025)
 
 o Build improvements
