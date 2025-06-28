@@ -29,6 +29,7 @@
         "build:esm": "tsc -p tsconfig.esm.json && npm run rename:esm",
         "build:types": "tsc --emitDeclarationOnly --declaration -p tsconfig.json --outDir dist/types",
         "build:manifests": "node ./scripts/generate-plugin-manifests.js",
+        "build:local-manifests": "node ./scripts/generate-local-plugin-manifests.js",
         "dev:manifests": "nodemon --watch src/plugins/impl -e ts --exec 'npm run build:manifests'",
         "build": "npm run build:manifests && npm run build:cjs && npm run build:esm && npm run build:types && npm run compile-scss && npm run replace-scss-imports",
         "build:replace-scss": "npm run replace-scss-imports",

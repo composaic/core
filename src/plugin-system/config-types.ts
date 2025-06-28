@@ -37,6 +37,18 @@ export interface SystemPluginConfig extends BasePluginConfig {
 }
 
 /**
+ * Local plugin configuration (individual manifest next to plugin)
+ */
+export interface LocalPluginConfig extends BasePluginConfig {
+    /** Plugin type identifier */
+    type: 'local';
+    /** Optional custom output directory (defaults to next to source) */
+    outputDir?: string;
+    /** Path to tsconfig.json file (optional) */
+    tsconfig?: string;
+}
+
+/**
  * Application plugin configuration within a collective manifest
  */
 export interface AppPluginConfig extends BasePluginConfig {
@@ -86,7 +98,11 @@ export interface OptimizationConfig {
  */
 export interface PluginManifestConfig {
     /** List of plugin configurations */
-    plugins: (SystemPluginConfig | ApplicationPluginConfig)[];
+    plugins: (
+        | SystemPluginConfig
+        | LocalPluginConfig
+        | ApplicationPluginConfig
+    )[];
     /** Build optimization settings */
     optimization?: OptimizationConfig;
 }
