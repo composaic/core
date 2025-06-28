@@ -20,6 +20,11 @@ describe('ManifestGenerator', () => {
         'MultiplePlugins.ts'
     );
     const tsConfigPath = path.join(fixturesDir, 'tsconfig.json');
+    const multiExtensionsPath = path.join(
+        fixturesDir,
+        'multiextensions',
+        'MultiExtensionsPlugin.ts'
+    );
 
     describe('generateManifest', () => {
         it('should generate manifest for NavbarExtension plugin', async () => {

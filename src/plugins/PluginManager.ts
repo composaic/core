@@ -354,16 +354,18 @@ export class PluginManager {
                         extensionPoint!.impl = [];
                     }
 
-                    // Find and replace or add new extension
+                    // Find and replace or add new extension using plugin + className as unique key
                     const existingIndex: number =
                         extensionPoint.impl!.findIndex(
-                            (ext: { plugin: string }) =>
-                                ext.plugin === pluginDescriptor.plugin
+                            (ext: { plugin: string; className?: string }) =>
+                                ext.plugin === pluginDescriptor.plugin &&
+                                ext.className === extension.className
                         );
                     if (existingIndex !== -1) {
                         // Replace existing extension
                         extensionPoint.impl![existingIndex] = {
                             plugin: pluginDescriptor.plugin,
+                            className: extension.className,
                             extensionImpl: extension.impl,
                             meta: extension.meta,
                         };
@@ -371,6 +373,7 @@ export class PluginManager {
                         // Add new extension
                         extensionPoint.impl!.push({
                             plugin: pluginDescriptor.plugin,
+                            className: extension.className,
                             extensionImpl: extension.impl,
                             meta: extension.meta,
                         });

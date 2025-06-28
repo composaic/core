@@ -34,7 +34,12 @@ export type ExtensionPoint = {
     id: string;
     type: string;
     singleton?: boolean;
-    impl?: { plugin: string; extensionImpl?: object; meta?: object }[];
+    impl?: {
+        plugin: string;
+        className?: string;
+        extensionImpl?: object;
+        meta?: object;
+    }[];
 };
 
 export type Extension = {

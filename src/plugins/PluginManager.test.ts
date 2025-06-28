@@ -698,4 +698,406 @@ describe('PluginManager', () => {
             // In this test we had no notifications as the extensions were already present at the time when the plugins with the respected extension points were added
         });
     });
+
+    describe('Multiple Extensions from Same Plugin', () => {
+        beforeEach(() => {
+            pluginManager = PluginManager.getInstance();
+            pluginManager.clear();
+        });
+
+        it('should handle multiple extensions from the same plugin correctly', async () => {
+            // Create a plugin that provides an extension point
+            const textProcessorDescriptor: PluginDescriptor = {
+                module: 'TextProcessorModule',
+                package: 'textprocessor',
+                class: 'TextProcessorPlugin',
+                plugin: 'textprocessor',
+                version: '1.0.0',
+                description: 'Text processing extension point provider',
+                extensionPoints: [
+                    {
+                        id: 'textprocessor.extension',
+                        type: 'TextProcessorExtension',
+                    },
+                ],
+            };
+
+            // Mock the loaded module for textprocessor
+            textProcessorDescriptor.loadedModule = {
+                TextProcessorPlugin: class MockTextProcessorPlugin {
+                    constructor() {}
+                    start() {}
+                },
+            };
+
+            // Create a plugin that provides multiple extensions to the same extension point
+            const multiExtensionDescriptor: PluginDescriptor = {
+                module: 'MultiExtensionModule',
+                package: 'multiextension',
+                class: 'MultiExtensionPlugin',
+                plugin: 'multiextension',
+                version: '1.0.0',
+                description:
+                    'Plugin with multiple extensions to same extension point',
+                extensions: [
+                    {
+                        plugin: 'textprocessor',
+                        id: 'textprocessor.extension',
+                        className: 'UpperCaseProcessor',
+                    },
+                    {
+                        plugin: 'textprocessor',
+                        id: 'textprocessor.extension',
+                        className: 'LowerCaseProcessor',
+                    },
+                    {
+                        plugin: 'textprocessor',
+                        id: 'textprocessor.extension',
+                        className: 'CamelCaseProcessor',
+                    },
+                ],
+            };
+
+            // Mock the loaded module with multiple processor classes
+            multiExtensionDescriptor.loadedModule = {
+                MultiExtensionPlugin: class MockMultiExtensionPlugin {
+                    constructor() {}
+                    start() {}
+                },
+                UpperCaseProcessor: class {
+                    processText(text: string) {
+                        return text.toUpperCase();
+                    }
+                    getLabel() {
+                        return 'Upper Case';
+                    }
+                    getId() {
+                        return 'uppercase';
+                    }
+                },
+                LowerCaseProcessor: class {
+                    processText(text: string) {
+                        return text.toLowerCase();
+                    }
+                    getLabel() {
+                        return 'Lower Case';
+                    }
+                    getId() {
+                        return 'lowercase';
+                    }
+                },
+                CamelCaseProcessor: class {
+                    processText(text: string) {
+                        return text
+                            .split(' ')
+                            .map(
+                                (word) =>
+                                    word.charAt(0).toUpperCase() +
+                                    word.slice(1).toLowerCase()
+                            )
+                            .join('');
+                    }
+                    getLabel() {
+                        return 'Camel Case';
+                    }
+                    getId() {
+                        return 'camelcase';
+                    }
+                },
+            };
+
+            // Add plugins in order
+            await PluginManager.getInstance().addPlugin(
+                textProcessorDescriptor
+            );
+            await PluginManager.getInstance().addPlugin(
+                multiExtensionDescriptor
+            );
+
+            // Get the textprocessor plugin
+            const textProcessorPlugin =
+                await PluginManager.getInstance().getPlugin('textprocessor');
+            expect(textProcessorPlugin).toBeDefined();
+
+            // Check that all 3 extensions are registered to the extension point
+            const extensionPoint =
+                textProcessorPlugin!.getPluginDescriptor().extensionPoints![0];
+            expect(extensionPoint.impl).toBeDefined();
+            expect(extensionPoint.impl).toHaveLength(3);
+
+            // Verify each extension has the correct plugin and className
+            const implementations = extensionPoint.impl!;
+
+            const upperCaseExt = implementations.find(
+                (impl) => impl.className === 'UpperCaseProcessor'
+            );
+            expect(upperCaseExt).toBeDefined();
+            expect(upperCaseExt!.plugin).toBe('multiextension');
+            expect(upperCaseExt!.className).toBe('UpperCaseProcessor');
+
+            const lowerCaseExt = implementations.find(
+                (impl) => impl.className === 'LowerCaseProcessor'
+            );
+            expect(lowerCaseExt).toBeDefined();
+            expect(lowerCaseExt!.plugin).toBe('multiextension');
+            expect(lowerCaseExt!.className).toBe('LowerCaseProcessor');
+
+            const camelCaseExt = implementations.find(
+                (impl) => impl.className === 'CamelCaseProcessor'
+            );
+            expect(camelCaseExt).toBeDefined();
+            expect(camelCaseExt!.plugin).toBe('multiextension');
+            expect(camelCaseExt!.className).toBe('CamelCaseProcessor');
+
+            // Verify that each extension has been instantiated correctly
+            expect(upperCaseExt!.extensionImpl).toBeDefined();
+            expect(lowerCaseExt!.extensionImpl).toBeDefined();
+            expect(camelCaseExt!.extensionImpl).toBeDefined();
+        });
+
+        it('should replace extensions with same plugin and className on reload', async () => {
+            // Create extension point plugin
+            const extensionPointDescriptor: PluginDescriptor = {
+                module: 'ExtensionPointModule',
+                package: 'extensionpoint',
+                class: 'ExtensionPointPlugin',
+                plugin: 'extensionpoint',
+                version: '1.0.0',
+                description: 'Extension point provider',
+                extensionPoints: [
+                    {
+                        id: 'test.extension',
+                        type: 'TestExtension',
+                    },
+                ],
+            };
+
+            extensionPointDescriptor.loadedModule = {
+                ExtensionPointPlugin: class MockExtensionPointPlugin {
+                    constructor() {}
+                    start() {}
+                },
+            };
+
+            // Create plugin with extension
+            const extensionDescriptor: PluginDescriptor = {
+                module: 'ExtensionModule',
+                package: 'extension',
+                class: 'ExtensionPlugin',
+                plugin: 'extension',
+                version: '1.0.0',
+                description: 'Extension provider',
+                extensions: [
+                    {
+                        plugin: 'extensionpoint',
+                        id: 'test.extension',
+                        className: 'TestProcessor',
+                    },
+                ],
+            };
+
+            extensionDescriptor.loadedModule = {
+                ExtensionPlugin: class MockExtensionPlugin {
+                    constructor() {}
+                    start() {}
+                },
+                TestProcessor: class {
+                    version = 'v1';
+                    processText(text: string) {
+                        return `v1: ${text}`;
+                    }
+                },
+            };
+
+            // Add plugins
+            await PluginManager.getInstance().addPlugin(
+                extensionPointDescriptor
+            );
+            await PluginManager.getInstance().addPlugin(extensionDescriptor);
+
+            // Verify initial state
+            const plugin =
+                await PluginManager.getInstance().getPlugin('extensionpoint');
+            expect(
+                plugin!.getPluginDescriptor().extensionPoints![0].impl
+            ).toHaveLength(1);
+            const initialImpl =
+                plugin!.getPluginDescriptor().extensionPoints![0].impl![0];
+            expect((initialImpl.extensionImpl as any).version).toBe('v1');
+
+            // Create updated extension with same plugin and className
+            const updatedExtensionDescriptor: PluginDescriptor = {
+                module: 'ExtensionModule',
+                package: 'extension',
+                class: 'ExtensionPlugin',
+                plugin: 'extension',
+                version: '1.0.1',
+                description: 'Updated extension provider',
+                extensions: [
+                    {
+                        plugin: 'extensionpoint',
+                        id: 'test.extension',
+                        className: 'TestProcessor', // Same className
+                    },
+                ],
+            };
+
+            updatedExtensionDescriptor.loadedModule = {
+                ExtensionPlugin: class MockExtensionPluginV2 {
+                    constructor() {}
+                    start() {}
+                },
+                TestProcessor: class {
+                    version = 'v2'; // Updated version
+                    processText(text: string) {
+                        return `v2: ${text}`;
+                    }
+                },
+            };
+
+            // Re-add the plugin (simulating reload)
+            await PluginManager.getInstance().addPlugin(
+                updatedExtensionDescriptor
+            );
+
+            // Verify that the extension was replaced, not duplicated
+            const updatedPlugin =
+                await PluginManager.getInstance().getPlugin('extensionpoint');
+            expect(
+                updatedPlugin!.getPluginDescriptor().extensionPoints![0].impl
+            ).toHaveLength(1);
+            const updatedImpl =
+                updatedPlugin!.getPluginDescriptor().extensionPoints![0]
+                    .impl![0];
+            expect((updatedImpl.extensionImpl as any).version).toBe('v2');
+        });
+
+        it('should handle multiple plugins each providing multiple extensions', async () => {
+            // Extension point plugin
+            const extensionPointDescriptor: PluginDescriptor = {
+                module: 'ExtensionPointModule',
+                package: 'extensionpoint',
+                class: 'ExtensionPointPlugin',
+                plugin: 'extensionpoint',
+                version: '1.0.0',
+                description: 'Extension point provider',
+                extensionPoints: [
+                    {
+                        id: 'processor.extension',
+                        type: 'ProcessorExtension',
+                    },
+                ],
+            };
+
+            extensionPointDescriptor.loadedModule = {
+                ExtensionPointPlugin: class MockExtensionPointPlugin {
+                    constructor() {}
+                    start() {}
+                },
+            };
+
+            // Plugin A with multiple extensions
+            const pluginADescriptor: PluginDescriptor = {
+                module: 'PluginAModule',
+                package: 'plugina',
+                class: 'PluginA',
+                plugin: 'plugina',
+                version: '1.0.0',
+                description: 'Plugin A with multiple extensions',
+                extensions: [
+                    {
+                        plugin: 'extensionpoint',
+                        id: 'processor.extension',
+                        className: 'ProcessorA1',
+                    },
+                    {
+                        plugin: 'extensionpoint',
+                        id: 'processor.extension',
+                        className: 'ProcessorA2',
+                    },
+                ],
+            };
+
+            pluginADescriptor.loadedModule = {
+                PluginA: class MockPluginA {},
+                ProcessorA1: class {
+                    getId() {
+                        return 'a1';
+                    }
+                },
+                ProcessorA2: class {
+                    getId() {
+                        return 'a2';
+                    }
+                },
+            };
+
+            // Plugin B with multiple extensions
+            const pluginBDescriptor: PluginDescriptor = {
+                module: 'PluginBModule',
+                package: 'pluginb',
+                class: 'PluginB',
+                plugin: 'pluginb',
+                version: '1.0.0',
+                description: 'Plugin B with multiple extensions',
+                extensions: [
+                    {
+                        plugin: 'extensionpoint',
+                        id: 'processor.extension',
+                        className: 'ProcessorB1',
+                    },
+                    {
+                        plugin: 'extensionpoint',
+                        id: 'processor.extension',
+                        className: 'ProcessorB2',
+                    },
+                ],
+            };
+
+            pluginBDescriptor.loadedModule = {
+                PluginB: class MockPluginB {},
+                ProcessorB1: class {
+                    getId() {
+                        return 'b1';
+                    }
+                },
+                ProcessorB2: class {
+                    getId() {
+                        return 'b2';
+                    }
+                },
+            };
+
+            // Add all plugins
+            await PluginManager.getInstance().addPlugin(
+                extensionPointDescriptor
+            );
+            await PluginManager.getInstance().addPlugin(pluginADescriptor);
+            await PluginManager.getInstance().addPlugin(pluginBDescriptor);
+
+            // Verify all 4 extensions are registered
+            const plugin =
+                await PluginManager.getInstance().getPlugin('extensionpoint');
+            const extensionPoint =
+                plugin!.getPluginDescriptor().extensionPoints![0];
+            expect(extensionPoint.impl).toHaveLength(4);
+
+            // Verify each plugin's extensions are present
+            const pluginAExtensions = extensionPoint.impl!.filter(
+                (impl) => impl.plugin === 'plugina'
+            );
+            expect(pluginAExtensions).toHaveLength(2);
+            expect(
+                pluginAExtensions.map((ext) => ext.className).sort()
+            ).toEqual(['ProcessorA1', 'ProcessorA2']);
+
+            const pluginBExtensions = extensionPoint.impl!.filter(
+                (impl) => impl.plugin === 'pluginb'
+            );
+            expect(pluginBExtensions).toHaveLength(2);
+            expect(
+                pluginBExtensions.map((ext) => ext.className).sort()
+            ).toEqual(['ProcessorB1', 'ProcessorB2']);
+        });
+    });
 });

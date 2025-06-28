@@ -14,6 +14,7 @@ import * as fs from 'fs';
 import {
     PluginManifestConfig,
     SystemPluginConfig,
+    LocalPluginConfig,
     ApplicationPluginConfig,
 } from './config-types';
 import { ManifestGenerator } from './manifest-generator';
@@ -23,7 +24,7 @@ const program = new Command();
 interface GenerateOptions {
     config?: string;
     plugin?: string;
-    type?: 'system' | 'application';
+    type?: 'system' | 'local' | 'application';
     output?: string;
     collection?: string;
     name?: string;
@@ -121,6 +122,152 @@ export async function generateSingleManifest(
 }
 
 /**
+ * Generate manifests for local plugins by scanning a directory
+ */
+export async function generateLocalPluginManifests(
+    config: LocalPluginConfig,
+    configDir: string,
+    force = false
+): Promise<void> {
+    const sourcePath = path.isAbsolute(config.source)
+        ? config.source
+        : path.resolve(configDir, config.source);
+
+    const tsconfigPath = path.isAbsolute(config.tsconfig || 'tsconfig.json')
+        ? config.tsconfig || 'tsconfig.json'
+        : path.resolve(configDir, config.tsconfig || 'tsconfig.json');
+
+    // Check if source is a directory or file
+    const sourceStat = fs.statSync(sourcePath);
+
+    if (sourceStat.isDirectory()) {
+        // Scan directory for plugin files
+        await scanDirectoryForPlugins(
+            sourcePath,
+            config.outputDir,
+            tsconfigPath,
+            force
+        );
+    } else if (sourceStat.isFile()) {
+        // Process single plugin file
+        await generateLocalPluginManifest(
+            sourcePath,
+            config.outputDir,
+            tsconfigPath,
+            force
+        );
+    } else {
+        throw new Error(
+            `Source path is neither a file nor directory: ${sourcePath}`
+        );
+    }
+}
+
+/**
+ * Scan a directory recursively for plugin files and generate manifests
+ */
+async function scanDirectoryForPlugins(
+    dirPath: string,
+    outputDir: string | undefined,
+    tsconfigPath: string,
+    force: boolean
+): Promise<void> {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+
+    for (const entry of entries) {
+        const fullPath = path.join(dirPath, entry.name);
+
+        if (entry.isDirectory()) {
+            // Recursively scan subdirectories
+            await scanDirectoryForPlugins(
+                fullPath,
+                outputDir,
+                tsconfigPath,
+                force
+            );
+        } else if (
+            entry.isFile() &&
+            (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx'))
+        ) {
+            // Check if this TypeScript file contains a plugin
+            if (await containsPluginMetadata(fullPath, tsconfigPath)) {
+                await generateLocalPluginManifest(
+                    fullPath,
+                    outputDir,
+                    tsconfigPath,
+                    force
+                );
+            }
+        }
+    }
+}
+
+/**
+ * Check if a TypeScript file contains plugin metadata
+ */
+async function containsPluginMetadata(
+    filePath: string,
+    tsconfigPath: string
+): Promise<boolean> {
+    try {
+        const generator = new ManifestGenerator({
+            tsConfigPath: tsconfigPath,
+            pluginPath: filePath,
+        });
+
+        // Try to generate manifest - if it succeeds, the file contains plugin metadata
+        await generator.generateManifest();
+        return true;
+    } catch (error) {
+        // If manifest generation fails, this file doesn't contain valid plugin metadata
+        return false;
+    }
+}
+
+/**
+ * Generate manifest for a single local plugin file
+ */
+async function generateLocalPluginManifest(
+    sourcePath: string,
+    outputDir: string | undefined,
+    tsconfigPath: string,
+    force: boolean
+): Promise<void> {
+    const generator = new ManifestGenerator({
+        tsConfigPath: tsconfigPath,
+        pluginPath: sourcePath,
+    });
+
+    try {
+        const manifest = await generator.generateManifest();
+
+        // Determine output path - next to source file by default
+        const sourceDir = path.dirname(sourcePath);
+        const pluginId = manifest.plugin;
+        const outputPath = outputDir
+            ? path.resolve(outputDir, `${pluginId}.manifest.json`)
+            : path.resolve(sourceDir, `${pluginId}.manifest.json`);
+
+        // Check if regeneration is needed
+        if (!needsRegeneration(sourcePath, outputPath, force)) {
+            console.log(`Skipping ${sourcePath} - manifest is up to date`);
+            return;
+        }
+
+        // Ensure output directory exists
+        const outputDirPath = path.dirname(outputPath);
+        if (!fs.existsSync(outputDirPath)) {
+            fs.mkdirSync(outputDirPath, { recursive: true });
+        }
+
+        fs.writeFileSync(outputPath, JSON.stringify(manifest, null, 4));
+        console.log(`Generated local plugin manifest: ${outputPath}`);
+    } catch (error) {
+        console.log(`Skipping ${sourcePath} - no valid plugin metadata found`);
+    }
+}
+
+/**
  * Generate manifests based on configuration
  */
 export async function generateFromConfig(
@@ -151,6 +298,12 @@ export async function generateFromConfig(
                 sourcePath,
                 outputPath,
                 tsconfigPath,
+                force
+            );
+        } else if (plugin.type === 'local') {
+            await generateLocalPluginManifests(
+                plugin as LocalPluginConfig,
+                configDir,
                 force
             );
         } else {
@@ -224,7 +377,7 @@ const generateCommand = new Command('generate')
     .description('Generate plugin manifests')
     .option('-c, --config <path>', 'path to configuration file')
     .option('-p, --plugin <path>', 'plugin source path (single plugin mode)')
-    .option('-t, --type <type>', 'plugin type (system or application)')
+    .option('-t, --type <type>', 'plugin type (system, local, or application)')
     .option('-o, --output <path>', 'output path for manifest')
     .option('--collection <glob>', 'glob pattern for collection plugins')
     .option('--collection-name <name>', 'collection name')
