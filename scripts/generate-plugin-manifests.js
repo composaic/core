@@ -33,17 +33,14 @@ function findPluginFolders() {
             if (!stats.isDirectory()) return null;
 
             const indexPath = path.join(folderPath, 'index.ts');
-            const pluginFile = `${folder}-plugin.json`;
-            const manifestPath = path.join(folderPath, pluginFile);
 
-            // Verify required files exist
-            if (!fs.existsSync(indexPath) || !fs.existsSync(manifestPath))
-                return null;
+            // Only check if index.ts exists
+            if (!fs.existsSync(indexPath)) return null;
 
             return {
                 folder,
                 indexPath,
-                manifestPath,
+                pluginFolder: folderPath,
             };
         })
         .filter(Boolean);
@@ -80,46 +77,20 @@ function reorderManifest(newManifest) {
  */
 function generateManifest(plugin) {
     console.log(`Processing plugin: ${plugin.folder}`);
+    try {
+        // Use the CLI to generate manifest (it will handle colocated manifests)
+        const forceFlag = process.argv.includes('--force') ? ' --force' : '';
+        execSync(
+            `node ${CLI_PATH} generate --config plugin-manifest.config.js${forceFlag}`,
+            {
+                stdio: 'inherit',
+            }
+        );
 
-    // Only generate if source is newer than manifest
-    if (needsRegeneration(plugin.indexPath, plugin.manifestPath)) {
-        console.log(`Generating manifest for: ${plugin.folder}`);
-        try {
-            // Create a temporary file for the new manifest
-            const tempManifestPath = `${plugin.manifestPath}.temp`;
-
-            execSync(
-                `node ${CLI_PATH} generate -p ${plugin.indexPath} -o ${tempManifestPath}`,
-                {
-                    stdio: 'inherit',
-                }
-            );
-
-            // Read the generated manifest
-            const newManifest = JSON.parse(
-                fs.readFileSync(tempManifestPath, 'utf8')
-            );
-
-            // Apply fixed field ordering
-            const orderedManifest = reorderManifest(newManifest);
-
-            // Write the ordered manifest directly to the plugin manifest file
-            fs.writeFileSync(
-                plugin.manifestPath,
-                JSON.stringify(orderedManifest, null, 4)
-            );
-            fs.unlinkSync(tempManifestPath);
-
-            console.log(`Updated plugin manifest: ${plugin.manifestPath}`);
-        } catch (error) {
-            console.error(
-                `Error generating manifest for ${plugin.folder}:`,
-                error
-            );
-            process.exit(1);
-        }
-    } else {
-        console.log(`Skipping ${plugin.folder} - manifest is up to date`);
+        console.log(`Generated manifest for ${plugin.folder}`);
+    } catch (error) {
+        console.error(`Error generating manifest for ${plugin.folder}:`, error);
+        process.exit(1);
     }
 }
 

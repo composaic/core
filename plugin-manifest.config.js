@@ -2,14 +2,12 @@
 module.exports = {
     plugins: [
         {
-            type: 'system',
+            type: 'local',
             source: 'src/plugins/impl/logger/index.ts',
-            output: 'src/plugins/impl/logger/logger-plugin.json',
         },
         {
-            type: 'system',
+            type: 'local',
             source: 'src/plugins/impl/signals/index.ts',
-            output: 'src/plugins/impl/signals/signals-plugin.json',
         },
     ],
     optimization: {

@@ -18,6 +18,8 @@ const PROJECTS = {
         path: 'core',
         needsLink: true,
         buildCommand: 'build', // Core is a library, no dev/prod distinction needed
+        handleForceManifests: () =>
+            'npm run build:manifests -- --force && npm run build:cjs && npm run build:esm && npm run build:types && npm run compile-scss && npm run replace-scss-imports',
     },
     web: {
         path: 'web',
@@ -26,6 +28,11 @@ const PROJECTS = {
         buildCommand: {
             development: 'build:dev', // Web project has specific dev/prod builds
             production: 'build',
+        },
+        handleForceManifests: (cmd) => {
+            // Set environment variable to pass force flag to web build
+            process.env.FORCE_MANIFEST_GENERATION = 'true';
+            return cmd;
         },
     },
     'test-plugin-one': {
@@ -85,7 +92,7 @@ function execCommand(command, projectPath, dryRun = false) {
     }
 }
 
-function buildProject(project, mode, dryRun) {
+function buildProject(project, mode, dryRun, forceManifests = false) {
     const config = PROJECTS[project];
     console.log(`\n🔨 Setting up ${project}...`);
 
@@ -113,7 +120,7 @@ function buildProject(project, mode, dryRun) {
                 : config.buildCommand[mode] || config.buildCommand.production;
 
         // For commands with multiple steps, split and handle each appropriately
-        const buildCmd = cmd.includes('&&')
+        let buildCmd = cmd.includes('&&')
             ? cmd
                   .split('&&')
                   .map((part) => {
@@ -127,6 +134,19 @@ function buildProject(project, mode, dryRun) {
                   .join(' && ')
             : `npm run ${cmd}`;
 
+        // For projects with force manifests, modify build commands to include force flag
+        if (forceManifests) {
+            if (config.handleForceManifests) {
+                buildCmd = config.handleForceManifests(buildCmd);
+            } else if (buildCmd.includes('build:manifests')) {
+                // For other projects that have build:manifests in their command
+                buildCmd = buildCmd.replace(
+                    /build:manifests/g,
+                    'build:manifests -- --force'
+                );
+            }
+        }
+
         execCommand(buildCmd, config.path, dryRun);
     }
 
@@ -137,9 +157,17 @@ function buildProject(project, mode, dryRun) {
     }
 }
 
-function rebuildManifests(dryRun = false, watchMode = false) {
+function rebuildManifests(
+    dryRun = false,
+    watchMode = false,
+    forceGeneration = false
+) {
     const mode = watchMode ? 'watch' : 'build';
-    const command = watchMode ? 'dev:manifests' : 'build:manifests -- --force';
+    const command = watchMode
+        ? 'dev:manifests'
+        : forceGeneration
+          ? 'build:manifests -- --force'
+          : 'build:manifests';
 
     console.log(
         `\n🔄 ${watchMode ? 'Starting manifest watchers' : 'Rebuilding manifests'} for application plugins...`
@@ -160,7 +188,7 @@ function rebuildManifests(dryRun = false, watchMode = false) {
     console.log(`\n✅ Manifest ${mode} completed`);
 }
 
-function initialManifestBuild(dryRun = false) {
+function initialManifestBuild(dryRun = false, forceGeneration = false) {
     console.log('\n🏗️  Building initial manifests before starting watchers...');
 
     // Get application plugins (those with serverCommand)
@@ -170,7 +198,13 @@ function initialManifestBuild(dryRun = false) {
 
     applicationPlugins.forEach((project) => {
         console.log(`\n📝 Building initial manifest for ${project}...`);
-        execCommand('npm run build:manifests', PROJECTS[project].path, dryRun);
+        execCommand(
+            forceGeneration
+                ? 'npm run build:manifests -- --force'
+                : 'npm run build:manifests',
+            PROJECTS[project].path,
+            dryRun
+        );
     });
 
     console.log('\n✅ Initial manifest build completed');
@@ -227,29 +261,29 @@ function startServer(project, dryRun) {
     });
 }
 
-async function buildFramework(mode, dryRun = false) {
+async function buildFramework(mode, dryRun = false, forceManifests = false) {
     // Build and link core first
     console.log('\n📦 Building core project...');
-    buildProject('core', mode, dryRun);
+    buildProject('core', mode, dryRun, forceManifests);
 
     // Build and link web next
     console.log(`\n📦 Building web project in ${mode} mode...`);
-    buildProject('web', mode, dryRun);
+    buildProject('web', mode, dryRun, forceManifests);
 
     // Build demo projects with proper linking
     console.log(`\n📦 Building demo projects in ${mode} mode...`);
-    buildProject('test-plugin-one', mode, dryRun);
-    buildProject('plugin-template', mode, dryRun);
-    buildProject('demo', mode, dryRun);
+    buildProject('test-plugin-one', mode, dryRun, forceManifests);
+    buildProject('plugin-template', mode, dryRun, forceManifests);
+    buildProject('demo', mode, dryRun, forceManifests);
 }
 
-async function startServers(dryRun = false) {
+async function startServers(dryRun = false, forceGeneration = false) {
     const projects = ['demo', 'test-plugin-one', 'plugin-template'];
 
     console.log('\n🚀 Starting development servers...');
 
     // Build initial manifests before starting servers
-    initialManifestBuild(dryRun);
+    initialManifestBuild(dryRun, forceGeneration);
 
     console.log(
         '📝 Note: Manifest watchers will be started automatically by each server'
@@ -267,7 +301,8 @@ async function startServers(dryRun = false) {
 }
 
 async function execute(options) {
-    const { dryRun, build, runServers, mode } = options;
+    const { dryRun, build, runServers, mode, forceManifestGeneration } =
+        options;
 
     if (dryRun) {
         console.log(
@@ -285,18 +320,18 @@ async function execute(options) {
 
     if (build) {
         console.log(`\n🔧 Building projects in ${mode} mode`);
-        await buildFramework(mode, dryRun);
+        await buildFramework(mode, dryRun, forceManifestGeneration);
 
         // If only building (not running servers), do one-time manifest generation
         if (!runServers) {
-            rebuildManifests(dryRun, false); // false = build mode (one-time)
+            rebuildManifests(dryRun, false, forceManifestGeneration); // false = build mode (one-time)
         }
     }
 
     if (runServers) {
         // When running servers, always use watch mode for manifests
         // Never skip manifest setup when running servers - we always want watchers
-        await startServers(dryRun, false); // false = don't skip manifest setup
+        await startServers(dryRun, forceManifestGeneration);
         console.log('Press Ctrl+C to stop all development servers');
     }
 
@@ -312,12 +347,13 @@ This script manages the build process and development server execution for the C
 It handles npm linking between packages and project builds.
 
 Required command line arguments:
-  -h, --help         Display this help message
-  -d, --dry-run      Dry run the script without executing any commands
-  -b, --build        Build the projects (npm install, link and build)
-  -r, --run-servers  Run the development servers (starts manifest watchers)
-  -m, --mode <mode>  Specify build mode for web projects (development or production)
-                     Core builds use standard library build regardless of mode
+  -h, --help                      Display this help message
+  -d, --dry-run                   Dry run the script without executing any commands
+  -b, --build                     Build the projects (npm install, link and build)
+  -r, --run-servers              Run the development servers (starts manifest watchers)
+  -m, --mode <mode>              Specify build mode for web projects (development or production)
+                                Core builds use standard library build regardless of mode
+  -f, --force-manifest-generation Force regeneration of manifests even if up to date
 
 Examples:
   Build all projects in development mode:
@@ -325,6 +361,9 @@ Examples:
 
   Build in production mode:
     dev-build -b -m production
+
+  Build with forced manifest generation:
+    dev-build -b -f
 
   Start development servers (starts manifest watchers):
     dev-build -r
@@ -342,6 +381,10 @@ program
     .option('-d, --dry-run', 'Show execution plan without making any changes')
     .option('-b, --build', 'Build all projects with proper linking')
     .option('-r, --run-servers', 'Run development servers')
+    .option(
+        '-f, --force-manifest-generation',
+        'Force manifest generation even if up to date'
+    )
     .option(
         '-m, --mode <mode>',
         'Specify build mode (development or production)',

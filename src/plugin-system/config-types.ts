@@ -2,8 +2,9 @@
  * Plugin Manifest Configuration Types
  *
  * This module defines the configuration schema for plugin manifest generation.
- * It supports both system plugins (individual manifests) and application plugins
- * (collective manifests).
+ * It supports two types of plugins:
+ * - Local plugins: Individual manifests colocated with their source
+ * - Remote plugins: Collective manifests for federated plugins
  */
 
 /**
@@ -25,27 +26,11 @@ interface BasePluginConfig {
 }
 
 /**
- * System plugin configuration (individual manifest)
- */
-export interface SystemPluginConfig extends BasePluginConfig {
-    /** Plugin type identifier */
-    type: 'system';
-    /** Output path for the manifest file */
-    output: string;
-    /** Path to tsconfig.json file (optional) */
-    tsconfig?: string;
-}
-
-/**
- * Local plugin configuration (individual manifest next to plugin)
+ * Local plugin configuration (individual manifest colocated with plugin)
  */
 export interface LocalPluginConfig extends BasePluginConfig {
     /** Plugin type identifier */
     type: 'local';
-    /** Optional custom output directory (defaults to next to source) */
-    outputDir?: string;
-    /** Path to tsconfig.json file (optional) */
-    tsconfig?: string;
 }
 
 /**
@@ -69,11 +54,11 @@ export interface CollectiveConfig {
 }
 
 /**
- * Application plugins collection configuration
+ * Remote plugin configuration (collective manifest for federated plugins)
  */
-export interface ApplicationPluginConfig {
+export interface RemotePluginConfig {
     /** Plugin type identifier */
-    type: 'application';
+    type: 'remote';
     /** Collective manifest configuration */
     collective: CollectiveConfig;
 }
@@ -98,11 +83,7 @@ export interface OptimizationConfig {
  */
 export interface PluginManifestConfig {
     /** List of plugin configurations */
-    plugins: (
-        | SystemPluginConfig
-        | LocalPluginConfig
-        | ApplicationPluginConfig
-    )[];
+    plugins: (LocalPluginConfig | RemotePluginConfig)[];
     /** Build optimization settings */
     optimization?: OptimizationConfig;
 }

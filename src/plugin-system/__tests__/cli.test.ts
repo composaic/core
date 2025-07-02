@@ -7,7 +7,7 @@ import {
     generateSingleManifest,
     generateFromConfig,
 } from '../cli';
-import { SystemPluginConfig } from '../config-types';
+import { LocalPluginConfig } from '../config-types';
 
 describe('CLI', () => {
     const fixturesDir = path.join(__dirname, 'fixtures');
@@ -22,16 +22,11 @@ describe('CLI', () => {
                 {
                     plugins: [
                         {
-                            type: 'system',
+                            type: 'local',
                             source: path.join(
                                 fixturesDir,
                                 'simplelogger',
                                 'SimpleLogger.ts'
-                            ),
-                            output: path.join(
-                                fixturesDir,
-                                'simplelogger',
-                                'logger-plugin-ai.json'
                             ),
                         },
                     ],
@@ -46,13 +41,13 @@ describe('CLI', () => {
         // Cleanup test files
         try {
             await fs.promises.unlink(configFile);
-            const aiManifestPath = path.join(
+            const manifestPath = path.join(
                 fixturesDir,
                 'simplelogger',
-                'logger-plugin-ai.json'
+                '@composaic:logger.manifest.json'
             );
-            if (fs.existsSync(aiManifestPath)) {
-                await fs.promises.unlink(aiManifestPath);
+            if (fs.existsSync(manifestPath)) {
+                await fs.promises.unlink(manifestPath);
             }
         } catch (error) {
             // Ignore cleanup errors
@@ -152,7 +147,7 @@ describe('CLI', () => {
         const outputPath = path.join(
             fixturesDir,
             'simplelogger',
-            'logger-plugin-ai.json'
+            '@composaic:logger.manifest.json'
         );
 
         afterEach(async () => {
@@ -167,12 +162,7 @@ describe('CLI', () => {
         });
 
         it('should generate manifest for a single plugin', async () => {
-            await generateSingleManifest(
-                sourcePath,
-                outputPath,
-                tsConfigPath,
-                true
-            );
+            await generateSingleManifest(sourcePath, outputPath, true);
             expect(fs.existsSync(outputPath)).toBe(true);
 
             const manifest = JSON.parse(fs.readFileSync(outputPath, 'utf8'));
@@ -185,21 +175,11 @@ describe('CLI', () => {
 
         it('should skip generation if manifest is up to date', async () => {
             // First generate the manifest
-            await generateSingleManifest(
-                sourcePath,
-                outputPath,
-                tsConfigPath,
-                true
-            );
+            await generateSingleManifest(sourcePath, outputPath, true);
             const originalStat = fs.statSync(outputPath);
 
             // Try to generate again without force
-            await generateSingleManifest(
-                sourcePath,
-                outputPath,
-                tsConfigPath,
-                false
-            );
+            await generateSingleManifest(sourcePath, outputPath, false);
             const newStat = fs.statSync(outputPath);
 
             expect(newStat.mtimeMs).toBe(originalStat.mtimeMs);
@@ -212,8 +192,11 @@ describe('CLI', () => {
             await generateFromConfig(config, configFile, true);
 
             // Verify manifest was generated
-            const plugin = config.plugins[0] as SystemPluginConfig;
-            const manifestPath = plugin.output;
+            const plugin = config.plugins[0] as LocalPluginConfig;
+            const manifestPath = path.join(
+                path.dirname(plugin.source),
+                '@composaic:logger.manifest.json'
+            );
             expect(fs.existsSync(manifestPath)).toBe(true);
 
             const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
@@ -226,15 +209,18 @@ describe('CLI', () => {
 
         it('should respect force flag when generating from config', async () => {
             const config = loadConfig(configFile);
-
-            // Generate first time
             await generateFromConfig(config, configFile, true);
-            const plugin = config.plugins[0] as SystemPluginConfig;
-            const firstStat = fs.statSync(plugin.output);
+
+            const plugin = config.plugins[0] as LocalPluginConfig;
+            const manifestPath = path.join(
+                path.dirname(plugin.source),
+                '@composaic:logger.manifest.json'
+            );
+            const firstStat = fs.statSync(manifestPath);
 
             // Try to generate again without force
             await generateFromConfig(config, configFile, false);
-            const secondStat = fs.statSync(plugin.output);
+            const secondStat = fs.statSync(manifestPath);
 
             expect(secondStat.mtimeMs).toBe(firstStat.mtimeMs);
         });

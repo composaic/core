@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.17.0 (?)
+
+o Support for forced manifest build (2 Jul 2025)
+
 ## 0.16.0 (28 Jun 2025)
 
 o Multiple extension per plugin support

@@ -69,6 +69,10 @@ export interface GenerateOptions {
      * Root of the project (for relative paths)
      */
     projectPath?: string;
+    /**
+     * Force generation even if up-to-date
+     */
+    force?: boolean;
 }
 
 /**
@@ -105,9 +109,17 @@ export interface GenerateCollectionOptions {
 export class ManifestGenerator {
     private program: ts.Program;
     private typeChecker: ts.TypeChecker;
-    private options: { tsConfigPath: string; pluginPath: string };
+    private options: {
+        tsConfigPath: string;
+        pluginPath: string;
+        force?: boolean;
+    };
 
-    constructor(options: { tsConfigPath: string; pluginPath: string }) {
+    constructor(options: {
+        tsConfigPath: string;
+        pluginPath: string;
+        force?: boolean;
+    }) {
         this.options = options;
         const { tsConfigPath } = options;
 
@@ -130,7 +142,9 @@ export class ManifestGenerator {
     /**
      * Generate a manifest for a single plugin
      */
-    async generateManifest(): Promise<PluginManifest> {
+    async generateManifest(
+        force = this.options.force
+    ): Promise<PluginManifest> {
         const sourceFile = this.program.getSourceFile(this.options.pluginPath);
         if (!sourceFile) {
             throw new Error(
@@ -219,9 +233,12 @@ export class ManifestGenerator {
                 const generator = new ManifestGenerator({
                     tsConfigPath: this.options.tsConfigPath,
                     pluginPath: source.sourcePath,
+                    force: this.options.force,
                 });
 
-                const manifest = await generator.generateManifest();
+                const manifest = await generator.generateManifest(
+                    this.options.force
+                );
                 if (!manifest) return;
 
                 // Remove extensionPoints and prepare the definition

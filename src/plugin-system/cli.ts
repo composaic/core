@@ -4,8 +4,7 @@
  * Plugin Manifest Generator CLI
  *
  * Command-line interface for generating plugin manifests from TypeScript decorators.
- * Supports both system plugins (individual manifests) and application plugins
- * (collective manifests).
+ * Supports local plugins (individual manifests) and remote plugins (collective manifests).
  */
 
 import { Command } from 'commander';
@@ -13,9 +12,8 @@ import path from 'path';
 import * as fs from 'fs';
 import {
     PluginManifestConfig,
-    SystemPluginConfig,
     LocalPluginConfig,
-    ApplicationPluginConfig,
+    RemotePluginConfig,
 } from './config-types';
 import { ManifestGenerator } from './manifest-generator';
 
@@ -24,7 +22,7 @@ const program = new Command();
 interface GenerateOptions {
     config?: string;
     plugin?: string;
-    type?: 'system' | 'local' | 'application';
+    type?: 'local' | 'remote';
     output?: string;
     collection?: string;
     name?: string;
@@ -80,14 +78,25 @@ export function needsRegeneration(
     outputPath: string,
     force = false
 ): boolean {
-    if (force) return true;
+    // Always regenerate if force is true
+    if (force) {
+        return true;
+    }
 
-    if (!fs.existsSync(outputPath)) return true;
+    // Always regenerate if output doesn't exist
+    if (!fs.existsSync(outputPath)) {
+        return true;
+    }
 
-    const manifestStat = fs.statSync(outputPath);
-    const sourceStat = fs.statSync(sourcePath);
+    try {
+        const manifestStat = fs.statSync(outputPath);
+        const sourceStat = fs.statSync(sourcePath);
 
-    return sourceStat.mtimeMs > manifestStat.mtimeMs;
+        return sourceStat.mtimeMs > manifestStat.mtimeMs;
+    } catch (error) {
+        // If there's any error reading the files, regenerate to be safe
+        return true;
+    }
 }
 
 /**
@@ -96,7 +105,6 @@ export function needsRegeneration(
 export async function generateSingleManifest(
     sourcePath: string,
     outputPath: string,
-    tsConfigPath: string,
     force = false
 ): Promise<void> {
     if (!needsRegeneration(sourcePath, outputPath, force)) {
@@ -104,9 +112,11 @@ export async function generateSingleManifest(
         return;
     }
 
+    const projectRoot = process.cwd();
     const generator = new ManifestGenerator({
-        tsConfigPath,
+        tsConfigPath: path.resolve(projectRoot, 'tsconfig.json'),
         pluginPath: sourcePath,
+        force: force,
     });
 
     const manifest = await generator.generateManifest();
@@ -133,9 +143,7 @@ export async function generateLocalPluginManifests(
         ? config.source
         : path.resolve(configDir, config.source);
 
-    const tsconfigPath = path.isAbsolute(config.tsconfig || 'tsconfig.json')
-        ? config.tsconfig || 'tsconfig.json'
-        : path.resolve(configDir, config.tsconfig || 'tsconfig.json');
+    const tsconfigPath = path.resolve(configDir, 'tsconfig.json');
 
     // Check if source is a directory or file
     const sourceStat = fs.statSync(sourcePath);
@@ -144,7 +152,7 @@ export async function generateLocalPluginManifests(
         // Scan directory for plugin files
         await scanDirectoryForPlugins(
             sourcePath,
-            config.outputDir,
+            undefined,
             tsconfigPath,
             force
         );
@@ -152,7 +160,7 @@ export async function generateLocalPluginManifests(
         // Process single plugin file
         await generateLocalPluginManifest(
             sourcePath,
-            config.outputDir,
+            undefined,
             tsconfigPath,
             force
         );
@@ -168,7 +176,7 @@ export async function generateLocalPluginManifests(
  */
 async function scanDirectoryForPlugins(
     dirPath: string,
-    outputDir: string | undefined,
+    _outputDir: string | undefined, // Keep parameter for now but ignore it
     tsconfigPath: string,
     force: boolean
 ): Promise<void> {
@@ -181,7 +189,7 @@ async function scanDirectoryForPlugins(
             // Recursively scan subdirectories
             await scanDirectoryForPlugins(
                 fullPath,
-                outputDir,
+                _outputDir,
                 tsconfigPath,
                 force
             );
@@ -193,7 +201,7 @@ async function scanDirectoryForPlugins(
             if (await containsPluginMetadata(fullPath, tsconfigPath)) {
                 await generateLocalPluginManifest(
                     fullPath,
-                    outputDir,
+                    undefined, // Always generate next to source
                     tsconfigPath,
                     force
                 );
@@ -229,24 +237,27 @@ async function containsPluginMetadata(
  */
 async function generateLocalPluginManifest(
     sourcePath: string,
-    outputDir: string | undefined,
+    _outputDir: string | undefined, // Keep parameter for now but ignore it
     tsconfigPath: string,
     force: boolean
 ): Promise<void> {
     const generator = new ManifestGenerator({
         tsConfigPath: tsconfigPath,
         pluginPath: sourcePath,
+        force: force,
     });
 
     try {
         const manifest = await generator.generateManifest();
 
-        // Determine output path - next to source file by default
+        // Always generate manifest next to source file
         const sourceDir = path.dirname(sourcePath);
-        const pluginId = manifest.plugin;
-        const outputPath = outputDir
-            ? path.resolve(outputDir, `${pluginId}.manifest.json`)
-            : path.resolve(sourceDir, `${pluginId}.manifest.json`);
+        // Replace '/' with ':' in plugin ID for the filename and remove nested directory
+        const pluginId = manifest.plugin.replace(
+            /(@[^\/]+)\/([^\/]+)/,
+            '$1:$2'
+        );
+        const outputPath = path.resolve(sourceDir, `${pluginId}.manifest.json`);
 
         // Check if regeneration is needed
         if (!needsRegeneration(sourcePath, outputPath, force)) {
@@ -277,84 +288,68 @@ export async function generateFromConfig(
 ): Promise<void> {
     const configDir = path.dirname(path.resolve(process.cwd(), configPath));
     for (const plugin of config.plugins) {
-        if (plugin.type === 'system') {
-            const systemPlugin = plugin as SystemPluginConfig;
-            const sourcePath = path.isAbsolute(systemPlugin.source)
-                ? systemPlugin.source
-                : path.resolve(configDir, systemPlugin.source);
-            const outputPath = path.isAbsolute(systemPlugin.output)
-                ? systemPlugin.output
-                : path.resolve(configDir, systemPlugin.output);
-            const tsconfigPath = path.isAbsolute(
-                systemPlugin.tsconfig || 'tsconfig.json'
-            )
-                ? systemPlugin.tsconfig || 'tsconfig.json'
-                : path.resolve(
-                      configDir,
-                      systemPlugin.tsconfig || 'tsconfig.json'
-                  );
-
-            await generateSingleManifest(
-                sourcePath,
-                outputPath,
-                tsconfigPath,
-                force
-            );
-        } else if (plugin.type === 'local') {
+        if (plugin.type === 'local') {
             await generateLocalPluginManifests(
                 plugin as LocalPluginConfig,
                 configDir,
                 force
             );
         } else {
-            const appPlugin = plugin as ApplicationPluginConfig;
-            const manifestPath = path.isAbsolute(appPlugin.collective.output)
-                ? appPlugin.collective.output
-                : path.resolve(configDir, appPlugin.collective.output);
+            const remotePlugin = plugin as RemotePluginConfig;
+            const manifestPath = path.isAbsolute(remotePlugin.collective.output)
+                ? remotePlugin.collective.output
+                : path.resolve(configDir, remotePlugin.collective.output);
 
-            // Check timestamps before any processing
-            if (!force && fs.existsSync(manifestPath)) {
-                const manifestTime = fs.statSync(manifestPath).mtimeMs;
-                let needsUpdate = false;
+            // When force is true, skip timestamp checks entirely
+            if (!force) {
+                // Only check timestamps if we're not forcing regeneration
+                if (fs.existsSync(manifestPath)) {
+                    const manifestTime = fs.statSync(manifestPath).mtimeMs;
+                    let needsUpdate = false;
 
-                for (const plugin of appPlugin.collective.plugins) {
-                    try {
-                        const sourcePath = path.isAbsolute(plugin.source)
-                            ? plugin.source
-                            : path.resolve(configDir, plugin.source);
-                        if (fs.statSync(sourcePath).mtimeMs > manifestTime) {
-                            needsUpdate = true;
-                            break;
+                    for (const plugin of remotePlugin.collective.plugins) {
+                        try {
+                            const sourcePath = path.isAbsolute(plugin.source)
+                                ? plugin.source
+                                : path.resolve(configDir, plugin.source);
+                            if (
+                                fs.statSync(sourcePath).mtimeMs > manifestTime
+                            ) {
+                                needsUpdate = true;
+                                break;
+                            }
+                        } catch {
+                            // Skip missing files
+                            continue;
                         }
-                    } catch {
-                        // Skip missing files
+                    }
+
+                    if (!needsUpdate) {
+                        console.log(
+                            `Skipping ${manifestPath} - no plugin files modified (use --force to override)`
+                        );
                         continue;
                     }
                 }
-
-                if (!needsUpdate) {
-                    console.log(
-                        `Skipping ${manifestPath} - no plugin files modified`
-                    );
-                    continue;
-                }
             }
 
+            const projectRoot = process.cwd();
             const generator = new ManifestGenerator({
-                tsConfigPath: path.resolve(configDir, 'tsconfig.json'),
+                tsConfigPath: path.resolve(projectRoot, 'tsconfig.json'),
                 pluginPath: path.isAbsolute(
-                    appPlugin.collective.plugins[0].source
+                    remotePlugin.collective.plugins[0].source
                 )
-                    ? appPlugin.collective.plugins[0].source
+                    ? remotePlugin.collective.plugins[0].source
                     : path.resolve(
                           configDir,
-                          appPlugin.collective.plugins[0].source
+                          remotePlugin.collective.plugins[0].source
                       ),
+                force: force,
             });
 
             const manifest = await generator.generateCollection({
-                name: appPlugin.collective.name,
-                pluginSources: appPlugin.collective.plugins.map((p) => ({
+                name: remotePlugin.collective.name,
+                pluginSources: remotePlugin.collective.plugins.map((p) => ({
                     sourcePath: path.isAbsolute(p.source)
                         ? p.source
                         : path.resolve(configDir, p.source),
@@ -377,11 +372,10 @@ const generateCommand = new Command('generate')
     .description('Generate plugin manifests')
     .option('-c, --config <path>', 'path to configuration file')
     .option('-p, --plugin <path>', 'plugin source path (single plugin mode)')
-    .option('-t, --type <type>', 'plugin type (system, local, or application)')
+    .option('-t, --type <type>', 'plugin type (local or remote)')
     .option('-o, --output <path>', 'output path for manifest')
     .option('--collection <glob>', 'glob pattern for collection plugins')
     .option('--collection-name <name>', 'collection name')
-    .option('--tsconfig <path>', 'path to tsconfig.json', 'tsconfig.json')
     .option('-f, --force', 'force regeneration even if up to date')
     .action(async (options: GenerateOptions) => {
         try {
@@ -397,7 +391,6 @@ const generateCommand = new Command('generate')
                 await generateSingleManifest(
                     options.plugin,
                     options.output,
-                    options.tsconfig || 'tsconfig.json',
                     options.force
                 );
             } else {
@@ -417,7 +410,6 @@ const generateCommand = new Command('generate')
 const watchCommand = new Command('watch')
     .description('Watch for changes and regenerate manifests')
     .option('-c, --config <path>', 'path to configuration file')
-    .option('--tsconfig <path>', 'path to tsconfig.json', 'tsconfig.json')
     .action(async (options) => {
         if (!options.config) {
             console.error('Config file is required for watch mode');

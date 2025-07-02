@@ -7,7 +7,6 @@ module.exports = {
             type: 'local',
             source: '../examples/textprocessor/src/plugins',
             tsconfig: '../examples/textprocessor/tsconfig.json',
-            // outputDir: './manifests', // Optional: specify custom output directory
         },
 
         // You can also specify individual local plugin files
