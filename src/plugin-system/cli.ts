@@ -28,6 +28,7 @@ interface GenerateOptions {
     name?: string;
     tsconfig?: string;
     force?: boolean;
+    verboseComposaic?: boolean;
 }
 
 /**
@@ -105,7 +106,8 @@ export function needsRegeneration(
 export async function generateSingleManifest(
     sourcePath: string,
     outputPath: string,
-    force = false
+    force = false,
+    verboseComposaic = false
 ): Promise<void> {
     if (!needsRegeneration(sourcePath, outputPath, force)) {
         console.log(`Skipping ${sourcePath} - manifest is up to date`);
@@ -117,6 +119,7 @@ export async function generateSingleManifest(
         tsConfigPath: path.resolve(projectRoot, 'tsconfig.json'),
         pluginPath: sourcePath,
         force: force,
+        verboseComposaic: verboseComposaic,
     });
 
     const manifest = await generator.generateManifest();
@@ -137,7 +140,8 @@ export async function generateSingleManifest(
 export async function generateLocalPluginManifests(
     config: LocalPluginConfig,
     configDir: string,
-    force = false
+    force = false,
+    verboseComposaic = false
 ): Promise<void> {
     const sourcePath = path.isAbsolute(config.source)
         ? config.source
@@ -154,7 +158,8 @@ export async function generateLocalPluginManifests(
             sourcePath,
             undefined,
             tsconfigPath,
-            force
+            force,
+            verboseComposaic
         );
     } else if (sourceStat.isFile()) {
         // Process single plugin file
@@ -162,7 +167,8 @@ export async function generateLocalPluginManifests(
             sourcePath,
             undefined,
             tsconfigPath,
-            force
+            force,
+            verboseComposaic
         );
     } else {
         throw new Error(
@@ -178,7 +184,8 @@ async function scanDirectoryForPlugins(
     dirPath: string,
     _outputDir: string | undefined, // Keep parameter for now but ignore it
     tsconfigPath: string,
-    force: boolean
+    force: boolean,
+    verboseComposaic = false
 ): Promise<void> {
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });
 
@@ -191,7 +198,8 @@ async function scanDirectoryForPlugins(
                 fullPath,
                 _outputDir,
                 tsconfigPath,
-                force
+                force,
+                verboseComposaic
             );
         } else if (
             entry.isFile() &&
@@ -203,7 +211,8 @@ async function scanDirectoryForPlugins(
                     fullPath,
                     undefined, // Always generate next to source
                     tsconfigPath,
-                    force
+                    force,
+                    verboseComposaic
                 );
             }
         }
@@ -239,12 +248,14 @@ async function generateLocalPluginManifest(
     sourcePath: string,
     _outputDir: string | undefined, // Keep parameter for now but ignore it
     tsconfigPath: string,
-    force: boolean
+    force: boolean,
+    verboseComposaic = false
 ): Promise<void> {
     const generator = new ManifestGenerator({
         tsConfigPath: tsconfigPath,
         pluginPath: sourcePath,
         force: force,
+        verboseComposaic: verboseComposaic,
     });
 
     try {
@@ -284,15 +295,23 @@ async function generateLocalPluginManifest(
 export async function generateFromConfig(
     config: PluginManifestConfig,
     configPath: string,
-    force = false
+    force = false,
+    verboseComposaic = false
 ): Promise<void> {
+    if (verboseComposaic) {
+        console.log(
+            `Processing config with ${config.plugins.length} plugin(s)`
+        );
+        console.log('Config:', JSON.stringify(config, null, 2));
+    }
     const configDir = path.dirname(path.resolve(process.cwd(), configPath));
     for (const plugin of config.plugins) {
         if (plugin.type === 'local') {
             await generateLocalPluginManifests(
                 plugin as LocalPluginConfig,
                 configDir,
-                force
+                force,
+                verboseComposaic
             );
         } else {
             const remotePlugin = plugin as RemotePluginConfig;
@@ -345,6 +364,7 @@ export async function generateFromConfig(
                           remotePlugin.collective.plugins[0].source
                       ),
                 force: force,
+                verboseComposaic: verboseComposaic,
             });
 
             const manifest = await generator.generateCollection({
@@ -377,11 +397,25 @@ const generateCommand = new Command('generate')
     .option('--collection <glob>', 'glob pattern for collection plugins')
     .option('--collection-name <name>', 'collection name')
     .option('-f, --force', 'force regeneration even if up to date')
+    .option(
+        '--verbose, --verbose-composaic',
+        'enable verbose output for Composaic operations'
+    )
     .action(async (options: GenerateOptions) => {
+        console.log(
+            'CLI Action called with options:',
+            JSON.stringify(options, null, 2)
+        );
         try {
             if (options.config) {
+                console.log('Loading config from:', options.config);
                 const config = loadConfig(options.config);
-                await generateFromConfig(config, options.config, options.force);
+                await generateFromConfig(
+                    config,
+                    options.config,
+                    options.force,
+                    options.verboseComposaic
+                );
             } else if (options.plugin) {
                 if (!options.output) {
                     throw new Error(
@@ -391,7 +425,8 @@ const generateCommand = new Command('generate')
                 await generateSingleManifest(
                     options.plugin,
                     options.output,
-                    options.force
+                    options.force,
+                    options.verboseComposaic
                 );
             } else {
                 throw new Error(

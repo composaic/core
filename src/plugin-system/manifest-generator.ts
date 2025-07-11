@@ -113,12 +113,14 @@ export class ManifestGenerator {
         tsConfigPath: string;
         pluginPath: string;
         force?: boolean;
+        verboseComposaic?: boolean;
     };
 
     constructor(options: {
         tsConfigPath: string;
         pluginPath: string;
         force?: boolean;
+        verboseComposaic?: boolean;
     }) {
         this.options = options;
         const { tsConfigPath } = options;
@@ -140,6 +142,15 @@ export class ManifestGenerator {
     }
 
     /**
+     * Log message only if verbose mode is enabled
+     */
+    private log(message: string, ...args: any[]): void {
+        if (this.options.verboseComposaic) {
+            console.log(message, ...args);
+        }
+    }
+
+    /**
      * Generate a manifest for a single plugin
      */
     async generateManifest(
@@ -152,22 +163,22 @@ export class ManifestGenerator {
             );
         }
 
-        console.log('Analyzing source file:', this.options.pluginPath);
+        this.log('Analyzing source file:', this.options.pluginPath);
         const result = this.findPluginClass(sourceFile);
-        console.log('Found plugin classes:', result ? 'yes' : 'no');
+        this.log('Found plugin classes:', result ? 'yes' : 'no');
 
         if (!result) {
-            console.log('Available classes:');
+            this.log('Available classes:');
             sourceFile.forEachChild((node) => {
                 if (ts.isClassDeclaration(node) && node.name) {
-                    console.log('- Class:', node.name.text);
-                    console.log(
+                    this.log('- Class:', node.name.text);
+                    this.log(
                         '  Can have decorators:',
                         ts.canHaveDecorators(node)
                     );
                     const decorators = ts.getDecorators(node);
                     if (decorators) {
-                        console.log(
+                        this.log(
                             '  Decorators:',
                             decorators
                                 .map((d: ts.Decorator) =>
@@ -177,11 +188,11 @@ export class ManifestGenerator {
                         );
                         decorators.forEach((d) => {
                             if (ts.isCallExpression(d.expression)) {
-                                console.log(
+                                this.log(
                                     '  Expression type:',
                                     d.expression.expression.getText()
                                 );
-                                console.log(
+                                this.log(
                                     '  Arguments:',
                                     d.expression.arguments.map((a) =>
                                         a.getText()
@@ -192,7 +203,7 @@ export class ManifestGenerator {
                     }
                 }
             });
-            console.log('Program options:', this.program.getCompilerOptions());
+            this.log('Program options:', this.program.getCompilerOptions());
             throw new Error('No plugin class found');
         }
 
@@ -218,6 +229,9 @@ export class ManifestGenerator {
     async generateCollection(
         options: GenerateCollectionOptions
     ): Promise<CollectionManifest> {
+        this.log(`Generating collection manifest for: ${options.name}`);
+        this.log(`Found ${options.pluginSources.length} plugin sources`);
+
         // Group plugins by their remote config
         const remoteGroups = new Map<
             string,
@@ -230,16 +244,23 @@ export class ManifestGenerator {
         // Process each plugin
         await Promise.all(
             options.pluginSources.map(async (source) => {
+                this.log(`Processing plugin: ${source.sourcePath}`);
                 const generator = new ManifestGenerator({
                     tsConfigPath: this.options.tsConfigPath,
                     pluginPath: source.sourcePath,
                     force: this.options.force,
+                    verboseComposaic: this.options.verboseComposaic,
                 });
 
                 const manifest = await generator.generateManifest(
                     this.options.force
                 );
-                if (!manifest) return;
+                if (!manifest) {
+                    this.log(`No manifest generated for: ${source.sourcePath}`);
+                    return;
+                }
+
+                this.log(`Generated manifest for plugin: ${manifest.plugin}`);
 
                 // Remove extensionPoints and prepare the definition
                 const {
@@ -291,31 +312,31 @@ export class ManifestGenerator {
             metadata: PluginMetadataType;
         }[] = [];
 
-        console.log('Starting class search...');
+        this.log('Starting class search...');
 
         const visit = (node: ts.Node) => {
             if (ts.isClassDeclaration(node)) {
-                console.log('Found class:', node.name?.getText());
+                this.log('Found class:', node.name?.getText());
                 const decorators = ts.getDecorators(node);
                 if (decorators && decorators.length > 0) {
-                    console.log(
+                    this.log(
                         'Class has decorators:',
                         decorators
                             .map((d: ts.Decorator) => {
                                 const text = d.expression.getText();
-                                console.log('Decorator expression:', text);
+                                this.log('Decorator expression:', text);
                                 return text;
                             })
                             .join(', ')
                     );
 
                     const metadata = this.getPluginMetadata(node);
-                    console.log('Metadata found:', metadata ? 'yes' : 'no');
+                    this.log('Metadata found:', metadata ? 'yes' : 'no');
                     if (metadata) {
                         pluginClasses.push({ pluginClass: node, metadata });
                     }
                 } else {
-                    console.log('Class has no decorators');
+                    this.log('Class has no decorators');
                 }
             }
             ts.forEachChild(node, visit);

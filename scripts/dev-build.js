@@ -20,6 +20,11 @@ const PROJECTS = {
         buildCommand: 'build', // Core is a library, no dev/prod distinction needed
         handleForceManifests: () =>
             'npm run build:manifests -- --force && npm run build:cjs && npm run build:esm && npm run build:types && npm run compile-scss && npm run replace-scss-imports',
+        handleVerboseComposaic: (cmd) => {
+            // Set environment variable to pass verbose flag
+            process.env.VERBOSE_COMPOSAIC = 'true';
+            return cmd;
+        },
     },
     web: {
         path: 'web',
@@ -34,6 +39,11 @@ const PROJECTS = {
             process.env.FORCE_MANIFEST_GENERATION = 'true';
             return cmd;
         },
+        handleVerboseComposaic: (cmd) => {
+            // Set environment variable to pass verbose flag to web build
+            process.env.VERBOSE_COMPOSAIC = 'true';
+            return cmd;
+        },
     },
     'test-plugin-one': {
         path: 'demo/applications/test-plugin-one',
@@ -44,6 +54,16 @@ const PROJECTS = {
             production: 'build', // Uses default production mode
         },
         serverCommand: 'start',
+        handleForceManifests: (cmd) => {
+            // Set environment variable to pass force flag
+            process.env.FORCE_MANIFEST_GENERATION = 'true';
+            return cmd;
+        },
+        handleVerboseComposaic: (cmd) => {
+            // Set environment variable to pass verbose flag
+            process.env.VERBOSE_COMPOSAIC = 'true';
+            return cmd;
+        },
     },
     'plugin-template': {
         path: 'demo/applications/plugin-template',
@@ -54,6 +74,16 @@ const PROJECTS = {
             production: 'build',
         },
         serverCommand: 'start',
+        handleForceManifests: (cmd) => {
+            // Set environment variable to pass force flag
+            process.env.FORCE_MANIFEST_GENERATION = 'true';
+            return cmd;
+        },
+        handleVerboseComposaic: (cmd) => {
+            // Set environment variable to pass verbose flag
+            process.env.VERBOSE_COMPOSAIC = 'true';
+            return cmd;
+        },
     },
     demo: {
         path: 'demo',
@@ -64,6 +94,16 @@ const PROJECTS = {
             production: 'build',
         },
         serverCommand: 'start',
+        handleForceManifests: (cmd) => {
+            // Set environment variable to pass force flag
+            process.env.FORCE_MANIFEST_GENERATION = 'true';
+            return cmd;
+        },
+        handleVerboseComposaic: (cmd) => {
+            // Set environment variable to pass verbose flag
+            process.env.VERBOSE_COMPOSAIC = 'true';
+            return cmd;
+        },
     },
 };
 
@@ -87,12 +127,31 @@ function execCommand(command, projectPath, dryRun = false) {
         console.error(
             `\n❌ Error executing command: ${command} in ${targetDir}`
         );
-        console.error(error);
+        console.error('Error details:', error.message || error);
+
+        // Check if this is a manifest-related command and provide more context
+        if (command.includes('build:manifests')) {
+            console.error('\n💡 Manifest generation failed. Common solutions:');
+            console.error('   - Use --force (-f) flag to force regeneration');
+            console.error('   - Check if plugin files have been modified');
+            console.error('   - Verify tsconfig.json exists and is valid');
+            console.error(
+                '   - Use --verbose-composaic (-V) for detailed output'
+            );
+        }
+
         process.exit(1);
     }
 }
 
-function buildProject(project, mode, dryRun, forceManifests = false) {
+function buildProject(
+    project,
+    mode,
+    dryRun,
+    forceManifests = false,
+    verboseComposaic = false,
+    verboseWebpack = false
+) {
     const config = PROJECTS[project];
     console.log(`\n🔨 Setting up ${project}...`);
 
@@ -125,6 +184,18 @@ function buildProject(project, mode, dryRun, forceManifests = false) {
                   .split('&&')
                   .map((part) => {
                       const trimmed = part.trim();
+                      // Replace build:manifests with direct CLI call
+                      if (trimmed === 'build:manifests') {
+                          const coreCliPath = path.resolve(
+                              __dirname,
+                              '../dist/cjs/plugin-system/cli.js'
+                          );
+                          const forceFlag = forceManifests ? ' --force' : '';
+                          const verboseFlag = verboseComposaic
+                              ? ' --verbose'
+                              : '';
+                          return `node ${coreCliPath} generate -c plugin-manifest.config.js${forceFlag}${verboseFlag}`;
+                      }
                       // Keep npx webpack commands as is, prefix others with npm run
                       return trimmed.startsWith('npx webpack') ||
                           trimmed.startsWith('webpack')
@@ -138,13 +209,16 @@ function buildProject(project, mode, dryRun, forceManifests = false) {
         if (forceManifests) {
             if (config.handleForceManifests) {
                 buildCmd = config.handleForceManifests(buildCmd);
-            } else if (buildCmd.includes('build:manifests')) {
-                // For other projects that have build:manifests in their command
-                buildCmd = buildCmd.replace(
-                    /build:manifests/g,
-                    'build:manifests -- --force'
-                );
             }
+            // Note: Direct CLI calls for build:manifests now handle force flag automatically
+        }
+
+        // Add verbose-composaic flag to manifest generation commands
+        if (verboseComposaic) {
+            if (config.handleVerboseComposaic) {
+                buildCmd = config.handleVerboseComposaic(buildCmd);
+            }
+            // Note: Direct CLI calls for build:manifests now handle verbose flag automatically
         }
 
         execCommand(buildCmd, config.path, dryRun);
@@ -160,14 +234,23 @@ function buildProject(project, mode, dryRun, forceManifests = false) {
 function rebuildManifests(
     dryRun = false,
     watchMode = false,
-    forceGeneration = false
+    forceGeneration = false,
+    verboseComposaic = false
 ) {
     const mode = watchMode ? 'watch' : 'build';
-    const command = watchMode
-        ? 'dev:manifests'
-        : forceGeneration
-          ? 'build:manifests -- --force'
-          : 'build:manifests';
+    let command;
+    if (watchMode) {
+        command = 'dev:manifests';
+    } else {
+        // Use direct CLI call for rebuild manifests too
+        const coreCliPath = path.resolve(
+            __dirname,
+            '../dist/cjs/plugin-system/cli.js'
+        );
+        const forceFlag = forceGeneration ? ' --force' : '';
+        const verboseFlag = verboseComposaic ? ' --verbose' : '';
+        command = `node ${coreCliPath} generate -c plugin-manifest.config.js${forceFlag}${verboseFlag}`;
+    }
 
     console.log(
         `\n🔄 ${watchMode ? 'Starting manifest watchers' : 'Rebuilding manifests'} for application plugins...`
@@ -182,7 +265,7 @@ function rebuildManifests(
         console.log(
             `\n📝 ${watchMode ? 'Starting manifest watcher' : 'Rebuilding manifest'} for ${project}...`
         );
-        execCommand(`npm run ${command}`, PROJECTS[project].path, dryRun);
+        execCommand(command, PROJECTS[project].path, dryRun);
     });
 
     console.log(`\n✅ Manifest ${mode} completed`);
@@ -261,20 +344,61 @@ function startServer(project, dryRun) {
     });
 }
 
-async function buildFramework(mode, dryRun = false, forceManifests = false) {
+async function buildFramework(
+    mode,
+    dryRun = false,
+    forceManifests = false,
+    verboseComposaic = false,
+    verboseWebpack = false
+) {
     // Build and link core first
     console.log('\n📦 Building core project...');
-    buildProject('core', mode, dryRun, forceManifests);
+    buildProject(
+        'core',
+        mode,
+        dryRun,
+        forceManifests,
+        verboseComposaic,
+        verboseWebpack
+    );
 
     // Build and link web next
     console.log(`\n📦 Building web project in ${mode} mode...`);
-    buildProject('web', mode, dryRun, forceManifests);
+    buildProject(
+        'web',
+        mode,
+        dryRun,
+        forceManifests,
+        verboseComposaic,
+        verboseWebpack
+    );
 
     // Build demo projects with proper linking
     console.log(`\n📦 Building demo projects in ${mode} mode...`);
-    buildProject('test-plugin-one', mode, dryRun, forceManifests);
-    buildProject('plugin-template', mode, dryRun, forceManifests);
-    buildProject('demo', mode, dryRun, forceManifests);
+    buildProject(
+        'test-plugin-one',
+        mode,
+        dryRun,
+        forceManifests,
+        verboseComposaic,
+        verboseWebpack
+    );
+    buildProject(
+        'plugin-template',
+        mode,
+        dryRun,
+        forceManifests,
+        verboseComposaic,
+        verboseWebpack
+    );
+    buildProject(
+        'demo',
+        mode,
+        dryRun,
+        forceManifests,
+        verboseComposaic,
+        verboseWebpack
+    );
 }
 
 async function startServers(dryRun = false, forceGeneration = false) {
@@ -301,8 +425,15 @@ async function startServers(dryRun = false, forceGeneration = false) {
 }
 
 async function execute(options) {
-    const { dryRun, build, runServers, mode, forceManifestGeneration } =
-        options;
+    const {
+        dryRun,
+        build,
+        runServers,
+        mode,
+        forceManifestGeneration,
+        verboseComposaic,
+        verboseWebpack,
+    } = options;
 
     if (dryRun) {
         console.log(
@@ -320,11 +451,22 @@ async function execute(options) {
 
     if (build) {
         console.log(`\n🔧 Building projects in ${mode} mode`);
-        await buildFramework(mode, dryRun, forceManifestGeneration);
+        await buildFramework(
+            mode,
+            dryRun,
+            forceManifestGeneration,
+            verboseComposaic,
+            verboseWebpack
+        );
 
         // If only building (not running servers), do one-time manifest generation
         if (!runServers) {
-            rebuildManifests(dryRun, false, forceManifestGeneration); // false = build mode (one-time)
+            rebuildManifests(
+                dryRun,
+                false,
+                forceManifestGeneration,
+                verboseComposaic
+            ); // false = build mode (one-time)
         }
     }
 
@@ -354,6 +496,8 @@ Required command line arguments:
   -m, --mode <mode>              Specify build mode for web projects (development or production)
                                 Core builds use standard library build regardless of mode
   -f, --force-manifest-generation Force regeneration of manifests even if up to date
+  -V, --verbose-composaic        Enable verbose output for Composaic operations (manifest generation)
+  -w, --verbose-webpack         Enable verbose output for webpack and build tools
 
 Examples:
   Build all projects in development mode:
@@ -365,6 +509,12 @@ Examples:
   Build with forced manifest generation:
     dev-build -b -f
 
+  Build with verbose Composaic output:
+    dev-build -b -V
+
+  Build with both verbose modes:
+    dev-build -b -V -w
+
   Start development servers (starts manifest watchers):
     dev-build -r
 
@@ -373,6 +523,7 @@ Examples:
 
 Note: When using --dry-run (-d), you must also specify either --build (-b) or --run-servers (-r) or both
 Note: -b uses build:manifests (one-time), -r uses dev:manifests (watch mode), -b -r uses dev:manifests
+Note: -V controls verbose output for manifest generation, -w controls verbose output for webpack builds
 `;
 
 program
@@ -389,6 +540,14 @@ program
         '-m, --mode <mode>',
         'Specify build mode (development or production)',
         'development'
+    )
+    .option(
+        '-V, --verbose-composaic',
+        'Enable verbose output for Composaic operations (manifest generation)'
+    )
+    .option(
+        '-w, --verbose-webpack',
+        'Enable verbose output for webpack and build tools'
     );
 
 program.action((options) => {

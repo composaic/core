@@ -80,8 +80,14 @@ function generateManifest(plugin) {
     try {
         // Use the CLI to generate manifest (it will handle colocated manifests)
         const forceFlag = process.argv.includes('--force') ? ' --force' : '';
+        // Check both command line argument and environment variable
+        const verboseComposiacFlag =
+            process.argv.includes('--verbose-composaic') ||
+            process.env.VERBOSE_COMPOSAIC === 'true'
+                ? ' --verbose-composaic'
+                : '';
         execSync(
-            `node ${CLI_PATH} generate --config plugin-manifest.config.js${forceFlag}`,
+            `node ${CLI_PATH} generate --config plugin-manifest.config.js${forceFlag}${verboseComposiacFlag}`,
             {
                 stdio: 'inherit',
             }
